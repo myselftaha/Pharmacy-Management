@@ -275,14 +275,25 @@ const Supply = mongoose.model('Supply', supplySchema);
 // Supplier Schema
 const supplierSchema = new mongoose.Schema({
     name: { type: String, required: true },
+    parentCompany: String, // e.g. GSK, Abbott
     contactPerson: String,
     phone: String,
     email: String,
     address: String,
-    city: String, // Added city
-    creditDays: { type: Number, default: 30 }, // Added creditDays
+    city: String,
+    ntn: String,
+    strn: String,
+    filerStatus: { type: String, enum: ['Filer', 'Non-Filer'], default: 'Filer' },
+    creditDays: { type: Number, default: 30 },
+    openingBalance: {
+        amount: { type: Number, default: 0 },
+        date: { type: Date, default: Date.now },
+        type: { type: String, enum: ['Debit', 'Credit'], default: 'Debit' } // Debit means we owe them
+    },
     totalPayable: { type: Number, default: 0 },
-    creditBalance: { type: Number, default: 0 }, // Separated Credit Store
+    creditBalance: { type: Number, default: 0 },
+    lastOrderDate: Date,
+    status: { type: String, enum: ['Active', 'Inactive'], default: 'Active' },
     createdAt: { type: Date, default: Date.now }
 });
 
@@ -294,6 +305,10 @@ const paymentSchema = new mongoose.Schema({
     amount: { type: Number, required: true },
     date: { type: Date, default: Date.now },
     method: { type: String, enum: ['Cash', 'Bank Transfer', 'Check', 'Debit Note', 'Credit Adjustment', 'Supplier Credit', 'Cash Refund'], default: 'Cash' },
+    chequeNumber: String,
+    chequeDate: Date,
+    bankName: String,
+    chequeStatus: { type: String, enum: ['N/A', 'Pending', 'Cleared', 'Bounced'], default: 'N/A' },
     note: String,
     createdAt: { type: Date, default: Date.now }
 });
@@ -317,23 +332,53 @@ const ItemPayment = mongoose.model('ItemPayment', itemPaymentSchema);
 const purchaseOrderSchema = new mongoose.Schema({
     distributorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplier', required: true },
     distributorName: String,
+    distributorInvoiceNumber: String,
+    invoiceDate: { type: Date, default: Date.now },
     items: [{
-        medicineId: String,
+        medicineId: { type: mongoose.Schema.Types.ObjectId, ref: 'Medicine' },
         medicineName: String,
-        quantity: Number,
-        unitPrice: Number,
-        total: Number
+        batchNumber: { type: String, required: true },
+        expiryDate: { type: Date, required: true },
+        billedQuantity: { type: Number, required: true },
+        bonusQuantity: { type: Number, default: 0 },
+        unitPrice: Number, // TP (Trade Price)
+        tradeDiscount: { type: Number, default: 0 }, // Discount %
+        taxPercent: { type: Number, default: 0 },
+        netItemTotal: Number,
+        costPerUnit: Number // Effective cost after bonus and discount
     }],
-    status: { type: String, enum: ['Pending', 'Completed', 'Cancelled'], default: 'Pending' },
+    status: { type: String, enum: ['Pending', 'Received', 'Cancelled'], default: 'Received' },
     expectedDelivery: Date,
     notes: String,
     subtotal: Number,
-    gst: Number,
+    gstAmount: Number,
+    whtAmount: Number, // Withholding Tax
     total: Number,
     createdAt: { type: Date, default: Date.now }
 });
 
 const PurchaseOrder = mongoose.model('PurchaseOrder', purchaseOrderSchema);
+
+// Purchase Return Schema (Debit Note)
+const purchaseReturnSchema = new mongoose.Schema({
+    supplierId: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplier', required: true },
+    supplierName: String,
+    items: [{
+        medicineId: { type: mongoose.Schema.Types.ObjectId, ref: 'Medicine' },
+        medicineName: String,
+        batchNumber: String,
+        quantity: Number,
+        unitPrice: Number, // TP
+        total: Number,
+        reason: { type: String, default: 'Expired' }
+    }],
+    totalAmount: Number,
+    date: { type: Date, default: Date.now },
+    notes: String,
+    createdAt: { type: Date, default: Date.now }
+});
+
+const PurchaseReturn = mongoose.model('PurchaseReturn', purchaseReturnSchema);
 
 // Batch Schema - Track individual batches with their own expiry, quantity, and status
 const batchSchema = new mongoose.Schema({
@@ -1769,17 +1814,28 @@ app.get('/api/suppliers', async (req, res) => {
 // Create new supplier
 app.post('/api/suppliers', async (req, res) => {
     try {
-        const { name, contactPerson, phone, email, address, city, creditDays } = req.body;
+        const {
+            name, parentCompany, contactPerson, phone, email, address, city,
+            ntn, strn, filerStatus, creditDays, openingBalance
+        } = req.body;
+
         const newSupplier = new Supplier({
             name,
+            parentCompany,
             contactPerson,
             phone,
             email,
             address,
             city,
-            creditDays,
-            totalPayable: req.body.outstandingBalance || 0
+            ntn,
+            strn,
+            filerStatus,
+            creditDays: creditDays || 30,
+            openingBalance: openingBalance || { amount: 0, date: new Date(), type: 'Debit' },
+            totalPayable: (openingBalance && openingBalance.type === 'Debit') ? openingBalance.amount : (req.body.outstandingBalance || 0),
+            creditBalance: (openingBalance && openingBalance.type === 'Credit') ? openingBalance.amount : 0
         });
+
         const savedSupplier = await newSupplier.save();
         res.status(201).json(savedSupplier);
     } catch (err) {
@@ -1857,11 +1913,15 @@ app.get('/api/suppliers/:id', async (req, res) => {
                 date: p.date,
                 type: isRefund ? 'Cash Refund' : (p.method === 'Debit Note' ? 'Debit Note' : 'Payment'),
                 ref: p.method,
+                method: p.method,
                 amount: p.amount,
                 status: 'Posted',
                 isCredit: isRefund, // Refund increases Payable (reduces negative balance)
                 isDebit: !isRefund, // Payment reduces Payable
-                note: p.note
+                note: p.note,
+                chequeNumber: p.chequeNumber,
+                chequeDate: p.chequeDate,
+                chequeStatus: p.chequeStatus || 'Cleared' // Default to cleared for legacy/cash
             };
         });
 
@@ -1871,11 +1931,15 @@ app.get('/api/suppliers/:id', async (req, res) => {
         let currentBalance = 0; // Starts at 0, builds up from actual transactions only
 
         allEntries = allEntries.map(entry => {
+            // For running balance, we only count Checks if they are Cleared.
+            // Other payment methods (Cash, Transfer, Debit Note) are counted immediately.
+            const isUnclearedCheque = entry.method === 'Check' && entry.chequeStatus !== 'Cleared';
+
             if (entry.isCredit) {
-                // Invoice increases Payable
+                // Invoice or Cash Refund increases Payable
                 currentBalance += (entry.amount || 0);
-            } else if (entry.isDebit) {
-                // Payment reduces Payable
+            } else if (entry.isDebit && !isUnclearedCheque) {
+                // Payment reduces Payable (only if not an uncleared cheque)
                 currentBalance -= (entry.amount || 0);
             }
             return {
@@ -1952,9 +2016,12 @@ app.get('/api/suppliers/:id', async (req, res) => {
             .reduce((acc, curr) => acc + (curr.amount || 0), 0);
 
         // Separate actual cash/bank payments from debit notes
-        const cashBankMethods = ['Cash', 'Bank Transfer', 'Check'];
+        // ONLY count Checks if they are Cleared
         const cashPayments = payments
-            .filter(p => cashBankMethods.includes(p.method))
+            .filter(p => {
+                if (p.method === 'Check') return p.chequeStatus === 'Cleared';
+                return ['Cash', 'Bank Transfer'].includes(p.method);
+            })
             .reduce((acc, curr) => acc + (curr.amount || 0), 0);
 
         // Calculate Cash Refunds
@@ -1965,10 +2032,10 @@ app.get('/api/suppliers/:id', async (req, res) => {
         // Net Purchases = Gross Invoices - Returns
         const totalPurchased = grossPurchased - totalReturns;
 
-        // CRITICAL: Total Paid = ONLY Cash/Bank/Check (DO NOT add returns, DO NOT subtract refunds here, treat separately)
+        // CRITICAL: Total Paid = ONLY Cash/Bank/Cleared Check
         const totalPaid = cashPayments;
 
-        // Balance = Net Purchases - Payments + Refunds (Refunds increase what we owe / decrease our credit asset)
+        // Balance = Net Purchases - Payments + Refunds
         const balance = totalPurchased - totalPaid + totalRefunds;
 
         // If balance is negative, we have a credit with the supplier
@@ -2113,6 +2180,10 @@ app.post('/api/suppliers/:id/pay-items', async (req, res) => {
             amount: paymentRecordAmount,
             date: paymentData.date || new Date(),
             method: paymentData.method || 'Cash',
+            chequeNumber: paymentData.chequeNumber,
+            chequeDate: paymentData.chequeDate,
+            bankName: paymentData.bankName,
+            chequeStatus: paymentData.method === 'Check' ? 'Pending' : 'N/A',
             note: paymentData.note || (isCreditAdjustment ? 'Credit Applied to Invoices' : '')
         });
         const savedPayment = await newPayment.save();
@@ -2146,13 +2217,12 @@ app.post('/api/suppliers/:id/pay-items', async (req, res) => {
 
         // 3. Update Supplier Balance
         if (isSupplierCredit) {
-            // Check Credit Balance
-            if ((supplier.creditBalance || 0) < totalAmount) {
-
-            }
             supplier.creditBalance = (supplier.creditBalance || 0) - totalAmount;
             supplier.totalPayable -= totalAmount; // Reduce Debt
             await supplier.save();
+        } else if (paymentData.method === 'Check') {
+            // Market standard (Pakistan): Balance is NOT deducted until cheque clears
+            console.log(`[PAY-ITEMS] Recorded PDC #${paymentData.chequeNumber}. Balance deduction deferred.`);
         } else if (!isCreditAdjustment) {
             // Cash/Bank
             supplier.totalPayable -= totalAmount;
@@ -2281,13 +2351,188 @@ app.get('/api/purchase-orders/supplier/:id', async (req, res) => {
     }
 });
 
+// Update Cheque Status (PDC Management)
+app.put('/api/payments/:id/clear-cheque', async (req, res) => {
+    try {
+        const { status } = req.body; // 'Cleared', 'Bounced'
+        const payment = await Payment.findById(req.params.id);
+        if (!payment) return res.status(404).json({ message: 'Payment not found' });
+        if (payment.method !== 'Check') return res.status(400).json({ message: 'Not a check payment' });
+
+        const supplier = await Supplier.findById(payment.supplierId);
+        if (!supplier) return res.status(404).json({ message: 'Supplier not found' });
+
+        const oldStatus = payment.chequeStatus;
+        payment.chequeStatus = status;
+        await payment.save();
+
+        // Logic: Only deduct balance if becoming 'Cleared'
+        if (status === 'Cleared' && oldStatus !== 'Cleared') {
+            supplier.totalPayable = (supplier.totalPayable || 0) - payment.amount;
+            await supplier.save();
+        } else if (status !== 'Cleared' && oldStatus === 'Cleared') {
+            // If it was cleared and now it's not (e.g. error correction), add back to payable
+            supplier.totalPayable = (supplier.totalPayable || 0) + payment.amount;
+            await supplier.save();
+        }
+
+        res.json({ message: `Cheque status updated to ${status}`, payment });
+    } catch (err) {
+        res.status(400).json({ message: err.message });
+    }
+});
+
 // Create new Purchase Order
 app.post('/api/purchase-orders', async (req, res) => {
     try {
-        const newOrder = new PurchaseOrder(req.body);
+        const {
+            distributorId, distributorInvoiceNumber, invoiceDate, items,
+            notes, expectedDelivery, subtotal, gstAmount, whtAmount, total
+        } = req.body;
+
+        const supplier = await Supplier.findById(distributorId);
+        if (!supplier) return res.status(404).json({ message: 'Supplier not found' });
+
+        const processedItems = [];
+        for (const item of items) {
+            // Find medicine
+            let medicine = await Medicine.findById(item.medicineId);
+            if (!medicine) {
+                // Try finding by custom numeric ID
+                if (typeof item.medicineId === 'number' || (typeof item.medicineId === 'string' && item.medicineId.match(/^\d+$/))) {
+                    medicine = await Medicine.findOne({ id: parseInt(item.medicineId) });
+                }
+            }
+
+            if (medicine) {
+                const billedQty = Number(item.billedQuantity) || 0;
+                const bonusQty = Number(item.bonusQuantity) || 0;
+                const totalUnits = billedQty + bonusQty;
+
+                // Update Medicine Overall Stock
+                medicine.stock = (medicine.stock || 0) + totalUnits;
+                medicine.inInventory = true;
+
+                // Update cost price in medicine master (use cost per unit)
+                if (item.costPerUnit) {
+                    medicine.costPrice = item.costPerUnit;
+                }
+
+                await medicine.save();
+
+                // Create/Update Batch for this medicine
+                // We create a new batch for every purchase by default unless batch number exists for this medicine
+                // Market standard: New batch = New entry
+                const newBatch = new Batch({
+                    batchNumber: item.batchNumber,
+                    medicineId: medicine._id,
+                    medicineName: medicine.name,
+                    quantity: totalUnits,
+                    purchasedQuantity: totalUnits,
+                    expiryDate: new Date(item.expiryDate),
+                    purchaseDate: invoiceDate || new Date(),
+                    supplierId: supplier._id,
+                    supplierName: supplier.name,
+                    costPrice: item.costPerUnit || item.unitPrice,
+                    sellingPrice: medicine.price || item.unitPrice * 1.2, // Default markup if not set
+                    status: 'Active'
+                });
+                await newBatch.save();
+
+                processedItems.push({
+                    ...item,
+                    costPerUnit: item.costPerUnit || (item.netItemTotal / totalUnits)
+                });
+            }
+        }
+
+        const newOrder = new PurchaseOrder({
+            distributorId,
+            distributorName: supplier.name,
+            distributorInvoiceNumber,
+            invoiceDate: invoiceDate || new Date(),
+            items: processedItems,
+            status: 'Received',
+            notes,
+            expectedDelivery,
+            subtotal,
+            gstAmount,
+            whtAmount,
+            total
+        });
+
         const savedOrder = await newOrder.save();
+
+        // Update Supplier Balance and Status
+        supplier.totalPayable = (supplier.totalPayable || 0) + total;
+        supplier.lastOrderDate = new Date();
+        supplier.status = 'Active';
+        await supplier.save();
+
         res.status(201).json(savedOrder);
     } catch (err) {
+        console.error('PO Creation Error:', err);
+        res.status(400).json({ message: err.message });
+    }
+});
+
+// Create Purchase Return (Debit Note)
+app.post('/api/purchase-returns', async (req, res) => {
+    try {
+        const { supplierId, items, totalAmount, notes, date } = req.body;
+
+        const supplier = await Supplier.findById(supplierId);
+        if (!supplier) return res.status(404).json({ message: 'Supplier not found' });
+
+        // Process items: Reduce stock and batch
+        for (const item of items) {
+            // 1. Reduce Medicine Overall Stock
+            const medicine = await Medicine.findById(item.medicineId);
+            if (medicine) {
+                medicine.stock = Math.max(0, (medicine.stock || 0) - item.quantity);
+                await medicine.save();
+            }
+
+            // 2. Reduce Batch Quantity
+            const batch = await Batch.findOne({
+                medicineId: item.medicineId,
+                batchNumber: item.batchNumber
+            });
+            if (batch) {
+                batch.quantity = Math.max(0, (batch.quantity || 0) - item.quantity);
+                if (batch.quantity === 0) batch.status = 'Expired'; // Auto-mark
+                await batch.save();
+            }
+        }
+
+        // Create the Return Record
+        const newReturn = new PurchaseReturn({
+            supplierId,
+            supplierName: supplier.name,
+            items,
+            totalAmount,
+            notes,
+            date: date || new Date()
+        });
+        await newReturn.save();
+
+        // Accounting: Reduce Supplier Balance (Create Adjustment Payment)
+        supplier.totalPayable = (supplier.totalPayable || 0) - totalAmount;
+        await supplier.save();
+
+        // Create a Payment record as Debit Note for ledger visibility
+        const debitNote = new Payment({
+            supplierId: supplier._id,
+            amount: totalAmount,
+            date: date || new Date(),
+            method: 'Debit Note',
+            note: notes || `Return of ${items.length} items (Credit Adjustment)`
+        });
+        await debitNote.save();
+
+        res.status(201).json({ message: 'Purchase return processed successfully', return: newReturn });
+    } catch (err) {
+        console.error('Purchase Return Error:', err);
         res.status(400).json({ message: err.message });
     }
 });
