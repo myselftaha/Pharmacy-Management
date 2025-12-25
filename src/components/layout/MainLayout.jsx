@@ -12,7 +12,7 @@ const MainLayout = ({ action }) => {
             case '/pos': return { title: 'POS Terminal', subtitle: 'Sales & Inventory' };
             case '/history': return { title: 'Sales History', subtitle: 'Sales History' };
             case '/medicines': return { title: 'Medicines Management', subtitle: 'Manage drugs and batches' };
-            case '/suppliers': return { title: 'Supplier Management', subtitle: 'Manage distributors' };
+            case '/suppliers': return { title: 'Distributor Management', subtitle: 'Manage wholesalers & suppliers' };
             case '/expenses': return { title: 'Expense Management', subtitle: 'Track Shop Expenses' };
             case '/reports': return { title: 'Profit & Loss Report', subtitle: 'Financial Overview' };
             case '/users': return { title: 'User Management', subtitle: 'User Management' };

@@ -279,6 +279,8 @@ const supplierSchema = new mongoose.Schema({
     phone: String,
     email: String,
     address: String,
+    city: String, // Added city
+    creditDays: { type: Number, default: 30 }, // Added creditDays
     totalPayable: { type: Number, default: 0 },
     creditBalance: { type: Number, default: 0 }, // Separated Credit Store
     createdAt: { type: Date, default: Date.now }
@@ -310,6 +312,28 @@ const itemPaymentSchema = new mongoose.Schema({
 });
 
 const ItemPayment = mongoose.model('ItemPayment', itemPaymentSchema);
+
+// Purchase Order Schema
+const purchaseOrderSchema = new mongoose.Schema({
+    distributorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplier', required: true },
+    distributorName: String,
+    items: [{
+        medicineId: String,
+        medicineName: String,
+        quantity: Number,
+        unitPrice: Number,
+        total: Number
+    }],
+    status: { type: String, enum: ['Pending', 'Completed', 'Cancelled'], default: 'Pending' },
+    expectedDelivery: Date,
+    notes: String,
+    subtotal: Number,
+    gst: Number,
+    total: Number,
+    createdAt: { type: Date, default: Date.now }
+});
+
+const PurchaseOrder = mongoose.model('PurchaseOrder', purchaseOrderSchema);
 
 // Batch Schema - Track individual batches with their own expiry, quantity, and status
 const batchSchema = new mongoose.Schema({
@@ -1745,7 +1769,17 @@ app.get('/api/suppliers', async (req, res) => {
 // Create new supplier
 app.post('/api/suppliers', async (req, res) => {
     try {
-        const newSupplier = new Supplier(req.body);
+        const { name, contactPerson, phone, email, address, city, creditDays } = req.body;
+        const newSupplier = new Supplier({
+            name,
+            contactPerson,
+            phone,
+            email,
+            address,
+            city,
+            creditDays,
+            totalPayable: req.body.outstandingBalance || 0
+        });
         const savedSupplier = await newSupplier.save();
         res.status(201).json(savedSupplier);
     } catch (err) {
@@ -2203,7 +2237,7 @@ app.post('/api/suppliers/return', async (req, res) => {
 // Update Supplier
 app.put('/api/suppliers/:id', async (req, res) => {
     try {
-        const { name, contactPerson, phone, email, address } = req.body;
+        const { name, contactPerson, phone, email, address, city, creditDays } = req.body;
 
         const supplier = await Supplier.findById(req.params.id);
         if (!supplier) return res.status(404).json({ message: 'Supplier not found' });
@@ -2214,10 +2248,60 @@ app.put('/api/suppliers/:id', async (req, res) => {
         if (phone !== undefined) supplier.phone = phone;
         if (email !== undefined) supplier.email = email;
         if (address !== undefined) supplier.address = address;
+        if (city !== undefined) supplier.city = city;
+        if (creditDays !== undefined) supplier.creditDays = creditDays;
 
         const updatedSupplier = await supplier.save();
         res.json(updatedSupplier);
 
+    } catch (err) {
+        res.status(400).json({ message: err.message });
+    }
+});
+
+// --- Purchase Order Routes ---
+
+// Get all Purchase Orders
+app.get('/api/purchase-orders', async (req, res) => {
+    try {
+        const orders = await PurchaseOrder.find().sort({ createdAt: -1 });
+        res.json(orders);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Get Purchase Orders for a specific supplier
+app.get('/api/purchase-orders/supplier/:id', async (req, res) => {
+    try {
+        const orders = await PurchaseOrder.find({ distributorId: req.params.id }).sort({ createdAt: -1 });
+        res.json(orders);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Create new Purchase Order
+app.post('/api/purchase-orders', async (req, res) => {
+    try {
+        const newOrder = new PurchaseOrder(req.body);
+        const savedOrder = await newOrder.save();
+        res.status(201).json(savedOrder);
+    } catch (err) {
+        res.status(400).json({ message: err.message });
+    }
+});
+
+// Update Purchase Order Status
+app.put('/api/purchase-orders/:id/status', async (req, res) => {
+    try {
+        const { status } = req.body;
+        const order = await PurchaseOrder.findById(req.params.id);
+        if (!order) return res.status(404).json({ message: 'Order not found' });
+
+        order.status = status;
+        const updatedOrder = await order.save();
+        res.json(updatedOrder);
     } catch (err) {
         res.status(400).json({ message: err.message });
     }

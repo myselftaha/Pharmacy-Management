@@ -26,7 +26,7 @@ const NAV_SECTIONS = [
             { icon: ShoppingBag, label: 'Sales', path: '/pos', allowedRoles: ['Admin', 'Super Admin', 'Pharmacist', 'Salesman / Counter Staff', 'Cashier'] },
             { icon: UsersRound, label: 'Customers', path: '/customers', allowedRoles: ['Admin', 'Super Admin', 'Pharmacist', 'Salesman / Counter Staff', 'Cashier'] },
             { icon: Clock, label: 'History', path: '/history', allowedRoles: ['Admin', 'Super Admin', 'Pharmacist', 'Salesman / Counter Staff', 'Cashier'] },
-            { icon: Users, label: 'Suppliers', path: '/suppliers', allowedRoles: ['Admin', 'Super Admin', 'Pharmacist', 'Store Keeper'] },
+            { icon: Users, label: 'Distributors', path: '/suppliers', allowedRoles: ['Admin', 'Super Admin', 'Pharmacist', 'Store Keeper'] },
             { icon: Package, label: 'Medicines', path: '/medicines', allowedRoles: ['Admin', 'Super Admin', 'Pharmacist', 'Store Keeper'] },
             { icon: ClipboardList, label: 'Inventory', path: '/inventory', allowedRoles: ['Admin', 'Super Admin', 'Pharmacist', 'Store Keeper'] },
             { icon: RotateCcw, label: 'Returns', path: '/return', allowedRoles: ['Admin', 'Super Admin', 'Pharmacist', 'Store Keeper', 'Delivery Rider'] },
