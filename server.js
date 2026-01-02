@@ -18,14 +18,25 @@ const getDateFilter = (range, customStart, customEnd) => {
             start.setHours(0, 0, 0, 0);
             end.setHours(23, 59, 59, 999);
             break;
+        case 'Yesterday':
+            start.setDate(now.getDate() - 1);
+            start.setHours(0, 0, 0, 0);
+            end.setDate(now.getDate() - 1);
+            end.setHours(23, 59, 59, 999);
+            break;
         case 'This Week':
-            // Start from Monday
-            const day = start.getDay() || 7; // Get current day number, converting Sun. to 7
-            if (day !== 1) start.setHours(-24 * (day - 1));
+        case 'Week':
+            if (range === 'This Week') {
+                const day = start.getDay() || 7;
+                if (day !== 1) start.setHours(-24 * (day - 1));
+            } else {
+                start.setDate(now.getDate() - 7);
+            }
             start.setHours(0, 0, 0, 0);
             end.setHours(23, 59, 59, 999);
             break;
         case 'This Month':
+        case 'Month':
             start.setDate(1);
             start.setHours(0, 0, 0, 0);
             end.setHours(23, 59, 59, 999);
@@ -36,17 +47,15 @@ const getDateFilter = (range, customStart, customEnd) => {
             end.setHours(23, 59, 59, 999);
             break;
         case 'All Time':
-            start = new Date(0); // 1970
+            start = new Date(0);
             end = new Date();
             break;
         case 'Custom':
             if (customStart) start = new Date(customStart);
             if (customEnd) end = new Date(customEnd);
-            // Ensure end of day for end date
             end.setHours(23, 59, 59, 999);
             break;
-        default: // 'This Month' default
-            start.setDate(1);
+        default:
             start.setHours(0, 0, 0, 0);
             end.setHours(23, 59, 59, 999);
     }

@@ -1,121 +1,107 @@
 import React from 'react';
-import { Calendar, Filter, X, Search } from 'lucide-react';
+import { Filter, X, CreditCard, User, Tag, Activity } from 'lucide-react';
 
-const FilterBar = ({ filters, onFilterChange, onReset, showFilters, setShowFilters }) => {
+const FilterBar = ({ filters, setFilters, onClose }) => {
 
     const handleChange = (key, value) => {
-        onFilterChange({ ...filters, [key]: value });
+        setFilters({ ...filters, [key]: value });
     };
 
+    const handleReset = () => {
+        setFilters({
+            paymentMethod: 'All',
+            status: 'All',
+            cashier: 'All',
+            type: 'All',
+            minAmount: '',
+            maxAmount: ''
+        });
+    };
+
+    const filterOptions = [
+        { label: 'Payment Method', key: 'paymentMethod', icon: CreditCard, options: ['All', 'Cash', 'Card', 'Credit / On Account'] },
+        { label: 'Status', key: 'status', icon: Activity, options: ['All', 'Posted', 'Voided'] },
+        { label: 'Type', key: 'type', icon: Tag, options: ['All', 'Sale', 'Return'] },
+        { label: 'Cashier', key: 'cashier', icon: User, options: ['All', 'Admin'] } // Should be dynamic in production
+    ];
+
     return (
-        <div className="space-y-4 mb-6">
-            <div className="flex justify-between items-center">
-                <div className="flex gap-2 items-center text-gray-500">
-                    <Filter size={18} />
-                    <span className="font-medium text-sm">Filters</span>
+        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-xl shadow-gray-200/50 relative overflow-hidden group">
+            <div className="flex justify-between items-center mb-6">
+                <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center text-[#00c950]">
+                        <Filter size={18} />
+                    </div>
+                    <h3 className="font-bold text-gray-800">Advanced Filters</h3>
                 </div>
-                <button
-                    onClick={() => setShowFilters(!showFilters)}
-                    className="text-sm text-green-600 font-medium hover:underline"
-                >
-                    {showFilters ? 'Hide Advanced Filters' : 'Show Advanced Filters'}
-                </button>
+                <div className="flex items-center gap-4">
+                    <button
+                        onClick={handleReset}
+                        className="text-sm font-bold text-gray-400 hover:text-red-500 transition-colors flex items-center gap-1.5"
+                    >
+                        <X size={16} /> Reset
+                    </button>
+                    <button
+                        onClick={onClose}
+                        className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 transition-colors"
+                    >
+                        <X size={20} />
+                    </button>
+                </div>
             </div>
 
-            {showFilters && (
-                <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4 animate-in fade-in slide-in-from-top-2">
-                    {/* Payment Method */}
-                    <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Payment Method</label>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {filterOptions.map((opt) => (
+                    <div key={opt.key}>
+                        <label className="flex items-center gap-2 text-xs font-bold text-gray-500 mb-2 uppercase tracking-wider">
+                            <opt.icon size={14} className="text-gray-400" />
+                            {opt.label}
+                        </label>
                         <select
-                            value={filters.paymentMethod}
-                            onChange={(e) => handleChange('paymentMethod', e.target.value)}
-                            className="w-full text-sm border-gray-200 rounded-lg focus:ring-green-500 focus:border-green-500"
+                            value={filters[opt.key]}
+                            onChange={(e) => handleChange(opt.key, e.target.value)}
+                            className="w-full h-11 px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm font-medium outline-none focus:border-[#00c950] focus:ring-4 focus:ring-[#00c950]/5 transition-all appearance-none cursor-pointer"
                         >
-                            <option value="All">All Methods</option>
-                            <option value="Cash">Cash</option>
-                            <option value="Card">Card</option>
-                            <option value="Credit">Credit / On Account</option>
+                            {opt.options.map(o => (
+                                <option key={o} value={o}>{o}</option>
+                            ))}
                         </select>
                     </div>
+                ))}
 
-                    {/* Status */}
-                    <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Status</label>
-                        <select
-                            value={filters.status}
-                            onChange={(e) => handleChange('status', e.target.value)}
-                            className="w-full text-sm border-gray-200 rounded-lg focus:ring-green-500 focus:border-green-500"
-                        >
-                            <option value="All">All Statuses</option>
-                            <option value="Posted">Posted</option>
-                            <option value="Voided">Voided</option>
-                        </select>
-                    </div>
-
-                    {/* Transaction Type */}
-                    <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Type</label>
-                        <select
-                            value={filters.type}
-                            onChange={(e) => handleChange('type', e.target.value)}
-                            className="w-full text-sm border-gray-200 rounded-lg focus:ring-green-500 focus:border-green-500"
-                        >
-                            <option value="All">All Types</option>
-                            <option value="Sale">Sale</option>
-                            <option value="Return">Return</option>
-                        </select>
-                    </div>
-
-                    {/* Cashier / User (Mock data for now, should ideally be dynamic) */}
-                    <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Cashier</label>
-                        <select
-                            value={filters.cashier}
-                            onChange={(e) => handleChange('cashier', e.target.value)}
-                            className="w-full text-sm border-gray-200 rounded-lg focus:ring-green-500 focus:border-green-500"
-                        >
-                            <option value="All">All Users</option>
-                            <option value="Admin">Admin</option>
-                            {/* Add other users dynamically if available */}
-                        </select>
-                    </div>
-
-                    {/* Amount Range */}
-                    <div className="md:col-span-2">
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Amount Range (Rs)</label>
-                        <div className="flex gap-2 items-center">
-                            <input
-                                type="number"
-                                placeholder="Min"
-                                className="w-full text-sm border-gray-200 rounded-lg"
-                                value={filters.minAmount}
-                                onChange={(e) => handleChange('minAmount', e.target.value)}
-                            />
-                            <span className="text-gray-400">-</span>
-                            <input
-                                type="number"
-                                placeholder="Max"
-                                className="w-full text-sm border-gray-200 rounded-lg"
-                                value={filters.maxAmount}
-                                onChange={(e) => handleChange('maxAmount', e.target.value)}
-                            />
-                        </div>
-                    </div>
-
-                    {/* Reset Button */}
-                    <div className="md:col-span-4 flex justify-end">
-                        <button
-                            onClick={onReset}
-                            className="text-sm text-red-500 hover:text-red-700 font-medium flex items-center gap-1"
-                        >
-                            <X size={14} /> Reset Filters
-                        </button>
+                <div className="lg:col-span-2">
+                    <label className="flex items-center gap-2 text-xs font-bold text-gray-500 mb-2 uppercase tracking-wider">
+                        <Activity size={14} className="text-gray-400" />
+                        Amount Range (Rs)
+                    </label>
+                    <div className="flex gap-3 items-center">
+                        <input
+                            type="number"
+                            placeholder="Min Price"
+                            className="w-full h-11 px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm font-medium outline-none focus:border-[#00c950] focus:ring-4 focus:ring-[#00c950]/5 transition-all"
+                            value={filters.minAmount}
+                            onChange={(e) => handleChange('minAmount', e.target.value)}
+                        />
+                        <div className="w-4 h-[2px] bg-gray-200" />
+                        <input
+                            type="number"
+                            placeholder="Max Price"
+                            className="w-full h-11 px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm font-medium outline-none focus:border-[#00c950] focus:ring-4 focus:ring-[#00c950]/5 transition-all"
+                            value={filters.maxAmount}
+                            onChange={(e) => handleChange('maxAmount', e.target.value)}
+                        />
                     </div>
                 </div>
-            )}
+            </div>
+
+            {/* Subtle background decoration */}
+            <div className="absolute -right-4 -bottom-4 opacity-[0.03] pointer-events-none">
+                <Filter size={120} />
+            </div>
         </div>
     );
 };
+
+FilterBar.Icon = Filter;
 
 export default FilterBar;
