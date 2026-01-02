@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
     Search, User, Trash2, RotateCcw, FileText,
-    Calendar, AlertCircle, Printer, X,
+    Calendar, AlertCircle, Printer, X, Banknote, CreditCard,
     Package, ChevronDown, Minus, Plus, Info, CheckCircle2
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
@@ -31,6 +31,7 @@ const Return = () => {
     const [showReceiptModal, setShowReceiptModal] = useState(false);
     const [returnReceipt, setReturnReceipt] = useState(null);
     const [dateFilter, setDateFilter] = useState('Today');
+    const [customDates, setCustomDates] = useState({ start: '', end: '' });
     const [loading, setLoading] = useState(false);
     const [selectedIndex, setSelectedIndex] = useState(0);
 
@@ -71,13 +72,16 @@ const Return = () => {
         }
     };
 
-    const fetchTransactions = async () => {
+    const fetchTransactions = async (q = '') => {
         try {
             const today = new Date();
             let startDate = '';
             let endDate = today.toISOString().split('T')[0];
 
-            if (dateFilter === 'Today') {
+            if (dateFilter === 'Custom') {
+                startDate = customDates.start;
+                endDate = customDates.end;
+            } else if (dateFilter === 'Today') {
                 startDate = endDate;
             } else if (dateFilter === 'Yesterday') {
                 const yesterday = new Date(today);
@@ -92,9 +96,12 @@ const Return = () => {
             const params = new URLSearchParams({
                 startDate,
                 endDate,
+                range: dateFilter,
                 type: 'Sale',
                 limit: '50'
             });
+            if (q) params.append('searchQuery', q);
+
             const response = await fetch(`${API_URL}/api/transactions?${params.toString()}`);
             const result = await response.json();
             const sales = (Array.isArray(result) ? result : (result.data || [])).filter(tx => tx.status !== 'Voided');
@@ -111,8 +118,11 @@ const Return = () => {
     }, []);
 
     useEffect(() => {
-        fetchTransactions();
-    }, [dateFilter]);
+        const timer = setTimeout(() => {
+            fetchTransactions(invoiceSearchQuery);
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [invoiceSearchQuery, dateFilter, customDates]);
 
     useEffect(() => {
         setSelectedIndex(0);
@@ -145,16 +155,7 @@ const Return = () => {
         ));
     }, [searchQuery, medicines]);
 
-    useEffect(() => {
-        const lowerQuery = invoiceSearchQuery.toLowerCase();
-        // If empty, show all for today/yesterday (standard behavior) but allow search
-        setFilteredTransactions(transactions.filter(tx =>
-            (tx.invoiceNumber?.toLowerCase().includes(lowerQuery)) ||
-            (tx.billNumber?.toString().includes(lowerQuery)) ||
-            (tx.customer?.name.toLowerCase().includes(lowerQuery)) ||
-            (tx.customer?.phone?.includes(lowerQuery))
-        ));
-    }, [invoiceSearchQuery, transactions]);
+    // Removal of local filtering useEffect as it's now server-driven
 
     // --- Helpers ---
     const calculateTotalRefund = () => {
@@ -179,7 +180,7 @@ const Return = () => {
             batch: '',
             invoiceMetadata: fromInvoice ? {
                 id: selectedInvoice.invoiceNumber || selectedInvoice.transactionId,
-                date: selectedInvoice.date,
+                date: item.createdAt || selectedInvoice.createdAt || selectedInvoice.date,
                 soldQty: item.quantity,
                 soldPrice: item.price
             } : null
@@ -355,7 +356,7 @@ const Return = () => {
                             <div className="flex-1">
                                 <p className="text-gray-700 font-bold">Original Sale:</p>
                                 <p className="text-gray-500">Invoice: {item.invoiceMetadata.id}</p>
-                                <p className="text-gray-500">Date: {new Date(item.invoiceMetadata.date).toLocaleDateString()}</p>
+                                <p className="text-gray-500">Date: {new Date(item.invoiceMetadata.date || Date.now()).toLocaleDateString()}</p>
                                 <p className="text-gray-500">Sold: {item.invoiceMetadata.soldQty} x Rs. {item.invoiceMetadata.soldPrice}</p>
                             </div>
                         </div>
@@ -487,6 +488,25 @@ const Return = () => {
                                         ))}
                                     </div>
                                 </div>
+                                {dateFilter === 'Custom' && (
+                                    <div className="flex items-center gap-2 px-6 border-r border-gray-100">
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="date"
+                                                value={customDates.start}
+                                                onChange={(e) => setCustomDates(prev => ({ ...prev, start: e.target.value }))}
+                                                className="px-2 py-1 text-xs border border-gray-200 rounded focus:border-red-400 focus:outline-none"
+                                            />
+                                            <span className="text-gray-400 text-xs">-</span>
+                                            <input
+                                                type="date"
+                                                value={customDates.end}
+                                                onChange={(e) => setCustomDates(prev => ({ ...prev, end: e.target.value }))}
+                                                className="px-2 py-1 text-xs border border-gray-200 rounded focus:border-red-400 focus:outline-none"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
                                 <div className="flex-1 relative group">
                                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-red-500 transition-colors" size={20} />
                                     <input
@@ -532,7 +552,7 @@ const Return = () => {
                                                 <div>
                                                     <div className="flex items-center gap-2 mb-1">
                                                         <h3 className="font-bold text-gray-900">Bill #{tx.billNumber}</h3>
-                                                        <span className="text-[10px] text-gray-400">• {new Date(tx.date).toLocaleDateString()}</span>
+                                                        <span className="text-[10px] text-gray-400">• {new Date(tx.createdAt || tx.date).toLocaleDateString()}</span>
                                                     </div>
                                                     <div className="flex items-center gap-2 text-xs text-gray-500">
                                                         <User size={12} className="text-gray-400" />
@@ -548,7 +568,6 @@ const Return = () => {
                                             {selectedInvoice?._id === tx._id && (
                                                 <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-2 md:grid-cols-3 gap-3">
                                                     {tx.items
-                                                        .filter(item => medicines.some(m => (m._id || m.id).toString() === (item.id || item.medicineId || item._id).toString()))
                                                         .map((item, idx) => (
                                                             <button
                                                                 key={idx}
@@ -642,29 +661,30 @@ const Return = () => {
 
                         {/* Footer / Controls */}
                         <div className="p-5 bg-white border-t border-gray-100 space-y-4">
-                            <div>
-                                <label className="text-[10px] font-bold text-gray-400 uppercase mb-2 block tracking-wider">Return Notes / Remarks</label>
-                                <textarea
-                                    value={returnNotes}
-                                    onChange={(e) => setReturnNotes(e.target.value)}
-                                    placeholder="e.g., Packaging damaged, Customer complaint..."
-                                    className="w-full p-4 bg-gray-50 border border-transparent rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-red-500/10 focus:bg-white transition-all min-h-[80px] resize-none"
-                                />
-                            </div>
-
-                            <div className="space-y-3">
-                                <div className="flex justify-between items-center group">
-                                    <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">Refund Method</span>
-                                    <div className="flex bg-gray-100 p-0.5 rounded-lg border border-gray-200">
-                                        {['Cash', 'Card', 'Credit'].map(m => (
-                                            <button
-                                                key={m}
-                                                onClick={() => setRefundMethod(m)}
-                                                className={`px-3 py-1.5 rounded-md text-[10px] font-bold transition-all ${refundMethod === m ? 'bg-gray-800 text-white shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                                            >
-                                                {m}
-                                            </button>
-                                        ))}
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block px-1">Refund Method</label>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <button
+                                            onClick={() => setRefundMethod('Cash')}
+                                            className={`flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-xl border-2 transition-all font-bold text-sm shadow-sm ${refundMethod === 'Cash'
+                                                ? 'border-[#fb2c36] bg-red-50/50 text-[#fb2c36]'
+                                                : 'border-gray-50 bg-gray-50/50 text-gray-400 hover:border-gray-200'
+                                                }`}
+                                        >
+                                            <Banknote size={20} />
+                                            Cash
+                                        </button>
+                                        <button
+                                            onClick={() => setRefundMethod('Card')}
+                                            className={`flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-xl border-2 transition-all font-bold text-sm shadow-sm ${refundMethod === 'Card'
+                                                ? 'border-blue-500 bg-blue-50/50 text-blue-500'
+                                                : 'border-gray-50 bg-gray-50/50 text-gray-400 hover:border-gray-200'
+                                                }`}
+                                        >
+                                            <CreditCard size={20} />
+                                            Card
+                                        </button>
                                     </div>
                                 </div>
 
@@ -691,104 +711,106 @@ const Return = () => {
             </div>
 
             {/* Receipt Modal */}
-            {showReceiptModal && returnReceipt && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[200] p-4 print:static print:bg-white print:p-0 print:block">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden print:shadow-none print:w-full print:max-w-none print:rounded-none">
-                        {/* Header */}
-                        <div className="bg-red-600 p-4 flex justify-between items-center text-white print:hidden">
-                            <h2 className="font-bold text-lg flex items-center gap-2">
-                                <CheckCircle2 size={20} />
-                                Return Success
-                            </h2>
-                            <button onClick={() => setShowReceiptModal(false)} className="hover:bg-red-700 p-1 rounded-full transition-colors">
-                                <X size={20} />
-                            </button>
-                        </div>
-
-                        {/* Receipt Content */}
-                        <div className="p-6 print:p-0" id="printable-receipt">
-                            <div className="text-center mb-6">
-                                <h1 className="text-2xl font-bold text-gray-800 mb-1">MedKit POS</h1>
-                                <p className="text-sm text-gray-500">Pharmacy Management System</p>
-                                <p className="text-xs text-gray-400 mt-2">{new Date(returnReceipt.date).toLocaleString()}</p>
-                                <div className="mt-2">
-                                    <p className="text-xl font-bold text-gray-800">Bill #: {returnReceipt.billNumber}</p>
-                                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Type: Return Voucher</p>
-                                </div>
+            {
+                showReceiptModal && returnReceipt && (
+                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[200] p-4 print:static print:bg-white print:p-0 print:block">
+                        <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden print:shadow-none print:w-full print:max-w-none print:rounded-none">
+                            {/* Header */}
+                            <div className="bg-red-600 p-4 flex justify-between items-center text-white print:hidden">
+                                <h2 className="font-bold text-lg flex items-center gap-2">
+                                    <CheckCircle2 size={20} />
+                                    Return Success
+                                </h2>
+                                <button onClick={() => setShowReceiptModal(false)} className="hover:bg-red-700 p-1 rounded-full transition-colors">
+                                    <X size={20} />
+                                </button>
                             </div>
 
-                            {/* Customer Info */}
-                            {returnReceipt.customer && (
-                                <div className="border border-gray-200 rounded-lg p-4 mb-4 bg-gray-50">
-                                    <h3 className="text-xs font-semibold text-gray-500 mb-2 uppercase">Customer Details</h3>
-                                    <div className="space-y-1">
-                                        <p className="text-sm font-medium text-gray-800">{returnReceipt.customer.name}</p>
-                                        <p className="text-xs text-gray-600">{returnReceipt.customer.phone}</p>
+                            {/* Receipt Content */}
+                            <div className="p-6 print:p-0" id="printable-receipt">
+                                <div className="text-center mb-6">
+                                    <h1 className="text-2xl font-bold text-gray-800 mb-1">MedKit POS</h1>
+                                    <p className="text-sm text-gray-500">Pharmacy Management System</p>
+                                    <p className="text-xs text-gray-400 mt-2">{new Date(returnReceipt.date).toLocaleString()}</p>
+                                    <div className="mt-2">
+                                        <p className="text-xl font-bold text-gray-800">Bill #: {returnReceipt.billNumber}</p>
+                                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Type: Return Voucher</p>
                                     </div>
                                 </div>
-                            )}
 
-                            <div className="border-t border-b border-dashed border-gray-300 py-4 mb-4 space-y-3">
-                                {returnReceipt.items.map((item, idx) => (
-                                    <div key={idx} className="flex justify-between text-sm">
-                                        <div>
-                                            <span className="font-medium text-gray-800">{item.name}</span>
-                                            <div className="text-xs text-gray-500">
-                                                {item.quantity} x Rs. {item.price.toFixed(2)}
-                                            </div>
-                                            <div className="text-[10px] text-red-500 italic">Reason: {item.returnReason}</div>
+                                {/* Customer Info */}
+                                {returnReceipt.customer && (
+                                    <div className="border border-gray-200 rounded-lg p-4 mb-4 bg-gray-50">
+                                        <h3 className="text-xs font-semibold text-gray-500 mb-2 uppercase">Customer Details</h3>
+                                        <div className="space-y-1">
+                                            <p className="text-sm font-medium text-gray-800">{returnReceipt.customer.name}</p>
+                                            <p className="text-xs text-gray-600">{returnReceipt.customer.phone}</p>
                                         </div>
-                                        <span className="font-medium text-gray-800">
-                                            Rs. {item.subtotal.toFixed(2)}
-                                        </span>
                                     </div>
-                                ))}
-                            </div>
+                                )}
 
-                            <div className="space-y-2 text-sm mb-6">
-                                <div className="flex justify-between text-gray-600">
-                                    <span>Subtotal</span>
-                                    <span>Rs. {returnReceipt.subtotal.toFixed(2)}</span>
-                                </div>
-                                <div className="flex justify-between font-bold text-lg text-gray-900 pt-2 border-t border-gray-200">
-                                    <span>Total Refund</span>
-                                    <span className="text-red-600 text-xl font-bold">Rs. {returnReceipt.total.toFixed(2)}</span>
+                                <div className="border-t border-b border-dashed border-gray-300 py-4 mb-4 space-y-3">
+                                    {returnReceipt.items.map((item, idx) => (
+                                        <div key={idx} className="flex justify-between text-sm">
+                                            <div>
+                                                <span className="font-medium text-gray-800">{item.name}</span>
+                                                <div className="text-xs text-gray-500">
+                                                    {item.quantity} x Rs. {item.price.toFixed(2)}
+                                                </div>
+                                                <div className="text-[10px] text-red-500 italic">Reason: {item.returnReason}</div>
+                                            </div>
+                                            <span className="font-medium text-gray-800">
+                                                Rs. {item.subtotal.toFixed(2)}
+                                            </span>
+                                        </div>
+                                    ))}
                                 </div>
 
-                                <div className="pt-4 mt-4 border-t border-dashed border-gray-300">
-                                    <div className="flex justify-between text-gray-800 text-sm font-medium">
-                                        <span>Refund Method</span>
-                                        <span>{returnReceipt.paymentMethod || 'N/A'}</span>
+                                <div className="space-y-2 text-sm mb-6">
+                                    <div className="flex justify-between text-gray-600">
+                                        <span>Subtotal</span>
+                                        <span>Rs. {returnReceipt.subtotal.toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-between font-bold text-lg text-gray-900 pt-2 border-t border-gray-200">
+                                        <span>Total Refund</span>
+                                        <span className="text-red-600 text-xl font-bold">Rs. {returnReceipt.total.toFixed(2)}</span>
+                                    </div>
+
+                                    <div className="pt-4 mt-4 border-t border-dashed border-gray-300">
+                                        <div className="flex justify-between text-gray-800 text-sm font-medium">
+                                            <span>Refund Method</span>
+                                            <span>{returnReceipt.paymentMethod || 'N/A'}</span>
+                                        </div>
                                     </div>
                                 </div>
+
+                                {/* Footer for Print */}
+                                <div className="hidden print:block text-center text-xs text-gray-500 mt-8">
+                                    <p>Thank you for your patience!</p>
+                                    <p>Inventory has been updated.</p>
+                                </div>
                             </div>
 
-                            {/* Footer for Print */}
-                            <div className="hidden print:block text-center text-xs text-gray-500 mt-8">
-                                <p>Thank you for your patience!</p>
-                                <p>Inventory has been updated.</p>
+                            {/* Actions */}
+                            <div className="p-4 bg-gray-50 border-t border-gray-100 flex gap-3 print:hidden">
+                                <button
+                                    onClick={() => setShowReceiptModal(false)}
+                                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors"
+                                >
+                                    Done
+                                </button>
+                                <button
+                                    onClick={() => window.print()}
+                                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-red-600/20"
+                                >
+                                    <Printer size={18} />
+                                    Print Receipt
+                                </button>
                             </div>
-                        </div>
-
-                        {/* Actions */}
-                        <div className="p-4 bg-gray-50 border-t border-gray-100 flex gap-3 print:hidden">
-                            <button
-                                onClick={() => setShowReceiptModal(false)}
-                                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors"
-                            >
-                                Done
-                            </button>
-                            <button
-                                onClick={() => window.print()}
-                                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-red-600/20"
-                            >
-                                <Printer size={18} />
-                                Print Receipt
-                            </button>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             <style jsx>{`
                 .custom-scrollbar::-webkit-scrollbar {
@@ -805,7 +827,7 @@ const Return = () => {
                     background: #cbd5e1;
                 }
             `}</style>
-        </div>
+        </div >
     );
 };
 

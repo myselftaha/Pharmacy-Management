@@ -3290,8 +3290,8 @@ app.get('/api/transactions', async (req, res) => {
 
         let query = {};
 
-        // Date filtering
-        if (range || startDate || endDate) {
+        // Date filtering - Skip if searchQuery is provided to allow global search
+        if ((range || startDate || endDate) && !searchQuery) {
             query.createdAt = getDateFilter(range, startDate, endDate);
         }
 
