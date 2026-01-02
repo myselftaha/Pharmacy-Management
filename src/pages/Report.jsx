@@ -477,22 +477,30 @@ const OverviewTab = ({ data, loading }) => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {data.kpis && data.kpis.map((kpi, idx) => {
                     const Icon = iconMap[kpi.icon] || Activity;
+                    const colorSchemes = [
+                        { bg: 'bg-blue-50', border: 'border-blue-100', text: 'text-blue-600', iconBg: 'bg-white/60', hoverBorder: 'hover:border-blue-200' },
+                        { bg: 'bg-emerald-50', border: 'border-emerald-100', text: 'text-emerald-600', iconBg: 'bg-white/60', hoverBorder: 'hover:border-emerald-200' },
+                        { bg: 'bg-orange-50', border: 'border-orange-100', text: 'text-orange-600', iconBg: 'bg-white/60', hoverBorder: 'hover:border-orange-200' },
+                        { bg: 'bg-purple-50', border: 'border-purple-100', text: 'text-purple-600', iconBg: 'bg-white/60', hoverBorder: 'hover:border-purple-200' },
+                    ];
+                    const scheme = colorSchemes[idx % colorSchemes.length];
+
                     return (
-                        <div key={idx} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm relative overflow-hidden group hover:border-green-100 transition-all">
+                        <div key={idx} className={`${scheme.bg} p-6 rounded-2xl border ${scheme.border} shadow-sm relative overflow-hidden group ${scheme.hoverBorder} transition-all`}>
                             <div className="flex flex-col">
                                 <p className="text-sm font-medium text-gray-500 mb-1">{kpi.label}</p>
                                 <div className="flex items-end justify-between">
                                     <div className="space-y-1">
-                                        <h3 className="text-2xl font-bold text-gray-900">{kpi.value}</h3>
+                                        <h3 className={`text-2xl font-bold ${scheme.text}`}>{kpi.value}</h3>
                                         {kpi.trend && (
-                                            <div className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full w-fit ${kpi.isUp ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'
+                                            <div className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full w-fit ${kpi.isUp ? 'text-green-600 bg-white/80' : 'text-red-600 bg-white/80'
                                                 }`}>
                                                 {kpi.isUp ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
                                                 {kpi.trend}
                                             </div>
                                         )}
                                     </div>
-                                    <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center text-green-600 transition-colors group-hover:bg-green-100 shrink-0">
+                                    <div className={`w-10 h-10 ${scheme.iconBg} rounded-xl flex items-center justify-center ${scheme.text} transition-colors group-hover:bg-white shrink-0`}>
                                         <Icon className="w-5 h-5" />
                                     </div>
                                 </div>
@@ -655,13 +663,21 @@ const SalesAnalysisTab = ({ data, loading }) => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {data.kpis && data.kpis.map((kpi, idx) => {
                     const Icon = iconMap[kpi.icon] || Activity;
+                    const colorSchemes = [
+                        { bg: 'bg-indigo-50', border: 'border-indigo-100', text: 'text-indigo-600', iconBg: 'bg-white/60', hoverBorder: 'hover:border-indigo-200' },
+                        { bg: 'bg-green-50', border: 'border-green-100', text: 'text-green-600', iconBg: 'bg-white/60', hoverBorder: 'hover:border-green-200' },
+                        { bg: 'bg-orange-50', border: 'border-orange-100', text: 'text-orange-600', iconBg: 'bg-white/60', hoverBorder: 'hover:border-yellow-200' },
+                        { bg: 'bg-purple-50', border: 'border-purple-100', text: 'text-purple-600', iconBg: 'bg-white/60', hoverBorder: 'hover:border-purple-200' },
+                    ];
+                    const scheme = colorSchemes[idx % colorSchemes.length];
+
                     return (
-                        <div key={idx} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm relative overflow-hidden group hover:border-green-100 transition-all">
+                        <div key={idx} className={`${scheme.bg} p-6 rounded-2xl border ${scheme.border} shadow-sm relative overflow-hidden group ${scheme.hoverBorder} transition-all`}>
                             <div className="flex flex-col">
                                 <p className="text-sm font-medium text-gray-500 mb-1">{kpi.label}</p>
                                 <div className="flex items-end justify-between">
-                                    <h3 className="text-2xl font-bold text-gray-900">{kpi.value}</h3>
-                                    <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center text-green-600 transition-colors group-hover:bg-green-100 shrink-0">
+                                    <h3 className={`text-2xl font-bold ${scheme.text}`}>{kpi.value}</h3>
+                                    <div className={`w-10 h-10 ${scheme.iconBg} rounded-xl flex items-center justify-center ${scheme.text} transition-colors group-hover:bg-white shrink-0`}>
                                         <Icon className="w-5 h-5" />
                                     </div>
                                 </div>
@@ -857,14 +873,6 @@ const QuickReportsTab = ({ onExport, data }) => {
         { title: 'Monthly Trend', desc: 'Month-over-month analysis', icon: Activity },
     ];
 
-    // Placeholder summary - ideally should come from props/API if needed
-    const quickReportSummary = data?.quickSummary || [
-        { label: 'Period Sales', value: 'N/A', color: 'text-gray-900' },
-        { label: 'Period Profit', value: 'N/A', color: 'text-green-600' },
-        { label: 'GST Collected', value: 'N/A', color: 'text-gray-900' },
-        { label: 'Discounts', value: 'N/A', color: 'text-gray-900' },
-    ];
-
     return (
         <div className="space-y-8">
             {/* Generate Reports Section */}
@@ -874,21 +882,35 @@ const QuickReportsTab = ({ onExport, data }) => {
                     <p className="text-sm text-gray-500">Select a report type and export in your preferred format</p>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {quickReports.map((report, idx) => (
-                        <button
-                            key={idx}
-                            onClick={() => onExport(report)}
-                            className="flex items-start gap-4 p-4 rounded-xl border border-gray-100 hover:border-[#00c950] hover:bg-green-50/10 transition-all text-left group"
-                        >
-                            <div className="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center text-green-600 group-hover:bg-green-100 shrink-0 transition-colors">
-                                <report.icon className="w-5 h-5" />
-                            </div>
-                            <div>
-                                <h4 className="font-bold text-gray-900 text-sm mb-1">{report.title}</h4>
-                                <p className="text-xs text-gray-500">{report.desc}</p>
-                            </div>
-                        </button>
-                    ))}
+                    {quickReports.map((report, idx) => {
+                        const colorSchemes = [
+                            { bg: 'bg-indigo-50/50', border: 'border-indigo-100', text: 'text-indigo-600', hoverBg: 'hover:bg-indigo-50', hoverBorder: 'hover:border-indigo-300' },
+                            { bg: 'bg-green-50/50', border: 'border-green-100', text: 'text-green-600', hoverBg: 'hover:bg-green-50', hoverBorder: 'hover:border-green-300' },
+                            { bg: 'bg-yellow-50/50', border: 'border-yellow-100', text: 'text-yellow-600', hoverBg: 'hover:bg-yellow-50', hoverBorder: 'hover:border-yellow-300' },
+                            { bg: 'bg-pink-50/50', border: 'border-pink-100', text: 'text-pink-600', hoverBg: 'hover:bg-pink-50', hoverBorder: 'hover:border-pink-300' },
+                            { bg: 'bg-blue-50/50', border: 'border-blue-100', text: 'text-blue-600', hoverBg: 'hover:bg-blue-50', hoverBorder: 'hover:border-blue-300' },
+                            { bg: 'bg-orange-50/50', border: 'border-orange-100', text: 'text-orange-600', hoverBg: 'hover:bg-orange-50', hoverBorder: 'hover:border-orange-300' },
+                            { bg: 'bg-cyan-50/50', border: 'border-cyan-100', text: 'text-cyan-600', hoverBg: 'hover:bg-cyan-50', hoverBorder: 'hover:border-cyan-300' },
+                            { bg: 'bg-rose-50/50', border: 'border-rose-100', text: 'text-rose-600', hoverBg: 'hover:bg-rose-50', hoverBorder: 'hover:border-rose-300' },
+                        ];
+                        const scheme = colorSchemes[idx % colorSchemes.length];
+
+                        return (
+                            <button
+                                key={idx}
+                                onClick={() => onExport(report)}
+                                className={`flex items-start gap-4 p-4 rounded-xl border ${scheme.bg} ${scheme.border} ${scheme.hoverBg} ${scheme.hoverBorder} transition-all text-left group shadow-sm`}
+                            >
+                                <div className={`w-10 h-10 rounded-lg bg-white flex items-center justify-center ${scheme.text} group-hover:scale-110 shrink-0 transition-all border ${scheme.border} shadow-sm`}>
+                                    <report.icon className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-gray-900 text-sm mb-1">{report.title}</h4>
+                                    <p className="text-xs text-gray-500 line-clamp-1">{report.desc}</p>
+                                </div>
+                            </button>
+                        );
+                    })}
                 </div>
             </div>
 
@@ -898,11 +920,16 @@ const QuickReportsTab = ({ onExport, data }) => {
                     <h3 className="text-lg font-bold text-gray-900">Report Summary</h3>
                     <p className="text-sm text-gray-500">Key metrics at a glance</p>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {quickReportSummary.map((item, idx) => (
-                        <div key={idx} className="p-5 bg-gray-50 rounded-xl border border-gray-100">
-                            <p className="text-sm font-medium text-gray-500 mb-2">{item.label}</p>
-                            <h4 className={`text-xl font-black ${item.color}`}>{item.value}</h4>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                    {(data?.quickSummary || [
+                        { label: 'Period Sales', value: 'N/A', colorScheme: { bg: 'bg-indigo-50', border: 'border-indigo-100', text: 'text-indigo-600' } },
+                        { label: 'Period Profit', value: 'N/A', colorScheme: { bg: 'bg-green-50', border: 'border-green-100', text: 'text-green-600' } },
+                        { label: 'GST Collected', value: 'N/A', colorScheme: { bg: 'bg-orange-50', border: 'border-orange-100', text: 'text-orange-600' } },
+                        { label: 'Discounts', value: 'N/A', colorScheme: { bg: 'bg-purple-50', border: 'border-purple-100', text: 'text-purple-600' } },
+                    ]).map((summary, idx) => (
+                        <div key={idx} className={`${summary.colorScheme?.bg || 'bg-gray-50'} p-4 rounded-xl border ${summary.colorScheme?.border || 'border-gray-100'} shadow-sm`}>
+                            <p className="text-xs font-medium text-gray-500 mb-1 uppercase tracking-wider">{summary.label}</p>
+                            <p className={`text-xl font-bold ${summary.colorScheme?.text || 'text-gray-900'}`}>{summary.value}</p>
                         </div>
                     ))}
                 </div>
