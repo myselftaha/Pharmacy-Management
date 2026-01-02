@@ -7,6 +7,53 @@ import jwt from 'jsonwebtoken';
 
 dotenv.config();
 
+// Helper to get date query for mongo
+const getDateFilter = (range, customStart, customEnd) => {
+    const now = new Date();
+    let start = new Date();
+    let end = new Date();
+
+    switch (range) {
+        case 'Today':
+            start.setHours(0, 0, 0, 0);
+            end.setHours(23, 59, 59, 999);
+            break;
+        case 'This Week':
+            // Start from Monday
+            const day = start.getDay() || 7; // Get current day number, converting Sun. to 7
+            if (day !== 1) start.setHours(-24 * (day - 1));
+            start.setHours(0, 0, 0, 0);
+            end.setHours(23, 59, 59, 999);
+            break;
+        case 'This Month':
+            start.setDate(1);
+            start.setHours(0, 0, 0, 0);
+            end.setHours(23, 59, 59, 999);
+            break;
+        case 'Year':
+            start.setMonth(0, 1);
+            start.setHours(0, 0, 0, 0);
+            end.setHours(23, 59, 59, 999);
+            break;
+        case 'All Time':
+            start = new Date(0); // 1970
+            end = new Date();
+            break;
+        case 'Custom':
+            if (customStart) start = new Date(customStart);
+            if (customEnd) end = new Date(customEnd);
+            // Ensure end of day for end date
+            end.setHours(23, 59, 59, 999);
+            break;
+        default: // 'This Month' default
+            start.setDate(1);
+            start.setHours(0, 0, 0, 0);
+            end.setHours(23, 59, 59, 999);
+    }
+    console.log(`[DEBUG] Date Range: ${range}, Start: ${start.toISOString()}, End: ${end.toISOString()}`);
+    return { $gte: start, $lte: end };
+};
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -1930,6 +1977,19 @@ app.post('/api/transactions', async (req, res) => {
     try {
         const { type, items, total, customer, voucher } = req.body;
 
+        // Map items to match Transaction Schema
+        const formattedItems = Array.isArray(items) ? items.map(item => ({
+            id: item.id || item.medicineId?.toString(), // Handle both formats
+            name: item.name || item.medicineName,
+            price: Number(item.price || item.unitPrice || 0),
+            quantity: Number(item.quantity || item.billedQuantity || 0),
+            subtotal: Number(item.subtotal || item.netItemTotal || 0),
+            restock: item.restock !== undefined ? item.restock : true,
+            // Preserve original fields if needed for debugging or loose schema
+            medicineId: item.medicineId,
+            saleType: item.saleType
+        })) : [];
+
         // If it's a return, ensure totals are negative if not already
         const isReturn = type === 'Return';
         const finalTotal = isReturn && total > 0 ? -total : total;
@@ -1951,6 +2011,7 @@ app.post('/api/transactions', async (req, res) => {
 
         const newTransaction = new Transaction({
             ...req.body,
+            items: formattedItems, // Use the formatted items
             invoiceNumber, // Added invoiceNumber
             billNumber: nextBillNumber,
             originalBillNumber,
@@ -1963,7 +2024,8 @@ app.post('/api/transactions', async (req, res) => {
 
         if (isReturn) {
             // RESTOCK Logic for Returns
-            for (const item of items) {
+            console.log("Processing restock for return items:", formattedItems);
+            for (const item of formattedItems) {
                 // Find medicine primarily by ID (number) or fallback to name if ID structure differs
                 let medicine = null;
                 const itemId = item.id;
@@ -2075,8 +2137,8 @@ app.post('/api/transactions', async (req, res) => {
             }
 
             // DEDUCT STOCK Logic for Sales
-            console.log("Processing stock deduction for items:", items);
-            for (const item of items) {
+            console.log("Processing stock deduction for items:", formattedItems);
+            for (const item of formattedItems) {
                 // Find medicine primarily by ID (number) or fallback to name if ID structure differs
                 console.log(`Checking stock for item: ID=${item.id}, _id=${item._id}, Qty=${item.quantity}`);
 
@@ -3211,7 +3273,7 @@ app.post('/api/suppliers/:id/record-refund', async (req, res) => {
 app.get('/api/transactions', async (req, res) => {
     try {
         const {
-            startDate, endDate, searchQuery,
+            startDate, endDate, range, searchQuery,
             page = 1, limit = 50,
             paymentMethod, status, cashier, type,
             minAmount, maxAmount
@@ -3220,16 +3282,8 @@ app.get('/api/transactions', async (req, res) => {
         let query = {};
 
         // Date filtering
-        if (startDate || endDate) {
-            query.createdAt = {};
-            if (startDate) {
-                query.createdAt.$gte = new Date(startDate);
-            }
-            if (endDate) {
-                const end = new Date(endDate);
-                end.setHours(23, 59, 59, 999);
-                query.createdAt.$lte = end;
-            }
+        if (range || startDate || endDate) {
+            query.createdAt = getDateFilter(range, startDate, endDate);
         }
 
         // Search filtering
@@ -4996,6 +5050,343 @@ function calculateReorderSuggestion(medicine) {
         estimatedDaysRemaining
     };
 }
+
+// --- REPORTS ANALYTICS ROUTES ---
+
+// Helper to get date range filter
+
+// 1. Overview Analytics
+app.get('/api/reports/analytics', async (req, res) => {
+    try {
+        const { range, startDate, endDate } = req.query;
+        const dateQuery = getDateFilter(range, startDate, endDate);
+
+        // A. Total Sales & Profit
+        // Note: Profit calculation is an approximation using current costPrice as historical cost isn't in Transaction
+        const salesStats = await Transaction.aggregate([
+            {
+                $match: {
+                    type: 'Sale',
+                    status: 'Posted',
+                    createdAt: dateQuery
+                }
+            },
+            {
+                $group: {
+                    _id: null,
+                    totalSales: { $sum: '$total' },
+                    count: { $sum: 1 },
+                    avgTransaction: { $avg: '$total' },
+                    totalGst: { $sum: '$tax' },
+                    totalDiscount: { $sum: '$discount' },
+                    itemsSold: { $sum: { $size: '$items' } }, // Approximate items count (lines), better to unwind but costly
+                    transactions: { $push: '$$ROOT' } // Keep transactions to lookup items
+                }
+            }
+        ]);
+
+        const totalSales = salesStats[0]?.totalSales || 0;
+        const txCount = salesStats[0]?.count || 0;
+        const avgTransaction = salesStats[0]?.avgTransaction || 0;
+        const totalGst = salesStats[0]?.totalGst || 0;
+        const totalDiscount = salesStats[0]?.totalDiscount || 0;
+
+        // Calculate Profit (Iterate items and sum (price - cost) * quantity)
+        // This is heavy, but necessary without stored profit. 
+        // Optimized: fetching all relevant medicine costs in one go.
+        let totalProfit = 0;
+        let accurateItemsSold = 0;
+
+        if (salesStats.length > 0) {
+            const allItemIds = new Set();
+            salesStats[0].transactions.forEach(tx => {
+                tx.items.forEach(item => {
+                    if (item.id) allItemIds.add(item.id.toString());
+                    accurateItemsSold += (item.quantity || 0);
+                });
+            });
+
+            // Fetch costs
+            // Handle both Number and ObjectId IDs
+            const numericIds = [...allItemIds].filter(id => !isNaN(id)).map(Number);
+            const objectIds = [...allItemIds].filter(id => isNaN(id));
+
+            const meds = await Medicine.find({
+                $or: [
+                    { id: { $in: numericIds } },
+                    { _id: { $in: objectIds } }
+                ]
+            }).select('id costPrice price');
+
+            const costMap = {};
+            meds.forEach(m => {
+                costMap[m.id] = m.costPrice;
+                costMap[m._id.toString()] = m.costPrice;
+            });
+
+            // Compute profit
+            salesStats[0].transactions.forEach(tx => {
+                tx.items.forEach(item => {
+                    const cost = Number(costMap[item.id] || costMap[item.id?.toString()] || 0);
+                    // Profit = (Selling Price * Qty) - (Cost Price * Qty)
+                    const sellingPrice = Number(item.price || item.unitPrice || 0);
+                    const qty = Number(item.quantity || item.billedQuantity || 0);
+
+                    const itemProfit = (sellingPrice * qty) - (cost * qty);
+                    if (!isNaN(itemProfit)) {
+                        totalProfit += itemProfit;
+                    }
+                });
+            });
+        }
+
+        const profitMargin = totalSales > 0 ? ((totalProfit / totalSales) * 100).toFixed(1) : 0;
+
+        // B. Payment Methods
+        const paymentMethods = await Transaction.aggregate([
+            { $match: { type: 'Sale', status: 'Posted', createdAt: dateQuery } },
+            { $group: { _id: '$paymentMethod', value: { $sum: '$total' } } },
+            { $project: { name: '$_id', value: { $ifNull: ['$value', 0] }, _id: 0 } }
+        ]);
+
+        // Add colors
+        const methodColors = { 'Cash': '#21c45d', 'Card': '#f59f0a', 'EasyPaisa': '#e61919', 'JazzCash': '#2671d9' };
+        const coloredPaymentMethods = paymentMethods.map(m => ({
+            ...m,
+            color: methodColors[m.name] || '#64748b'
+        }));
+
+        // D. Top Selling Medicines (Robust Aggregation with Fallbacks)
+        const topSelling = await Transaction.aggregate([
+            { $match: { type: 'Sale', status: 'Posted', createdAt: dateQuery } },
+            { $unwind: '$items' },
+            {
+                $group: {
+                    _id: '$items.id', // Group by Item ID
+                    name: { $first: { $ifNull: ['$items.name', '$items.medicineName'] } },
+                    sold: {
+                        $sum: {
+                            $ifNull: ['$items.quantity', { $ifNull: ['$items.billedQuantity', 0] }]
+                        }
+                    },
+                    revenue: {
+                        $sum: {
+                            $multiply: [
+                                { $ifNull: ['$items.price', { $ifNull: ['$items.unitPrice', 0] }] },
+                                { $ifNull: ['$items.quantity', { $ifNull: ['$items.billedQuantity', 0] }] }
+                            ]
+                        }
+                    }
+                }
+            },
+            { $sort: { revenue: -1 } },
+            { $limit: 5 }
+        ]);
+
+        const formattedTopSelling = topSelling.map(item => ({
+            name: item.name,
+            sold: item.sold,
+            revenue: `Rs. ${item.revenue.toLocaleString()}`,
+            isUp: true
+        }));
+
+        // E. Credit Sales
+        const creditStats = await Transaction.aggregate([
+            { $match: { type: 'Sale', status: 'Posted', paymentMethod: 'Credit', createdAt: dateQuery } },
+            { $group: { _id: null, total: { $sum: '$total' }, count: { $sum: 1 } } }
+        ]);
+        const creditTotal = creditStats[0]?.total || 0;
+
+        // F. Returns
+        const returnStats = await Transaction.aggregate([
+            { $match: { type: 'Return', status: 'Posted', createdAt: dateQuery } },
+            { $group: { _id: null, total: { $sum: '$total' }, count: { $sum: 1 } } }
+        ]);
+        const returnTotal = returnStats[0]?.total || 0;
+        const returnCount = returnStats[0]?.count || 0;
+
+
+        res.json({
+            kpis: [
+                { label: 'Total Sales', value: `Rs. ${totalSales.toLocaleString()}`, trend: '+0%', isUp: true, icon: 'DollarSign' },
+                { label: 'Total Profit', value: `Rs. ${totalProfit.toLocaleString()}`, trend: `${profitMargin}% Margin`, isUp: totalProfit > 0, icon: 'TrendingUp' },
+                { label: 'Transactions', value: txCount, trend: 'Count', isUp: true, icon: 'Activity' },
+                { label: 'Avg. Transaction', value: `Rs. ${Math.round(avgTransaction).toLocaleString()}`, trend: 'Avg', isUp: true, icon: 'BarChart2' },
+            ],
+            salesKpis: [
+                { label: 'Total Transactions', value: txCount, icon: 'Activity' },
+                { label: 'Items Sold', value: accurateItemsSold, icon: 'Layers' },
+                { label: 'GST Collected', value: `Rs. ${totalGst.toLocaleString()}`, icon: 'DollarSign' },
+                { label: 'Discounts', value: `Rs. ${totalDiscount.toLocaleString()}`, icon: 'TrendingDown' },
+            ],
+            paymentMethods: coloredPaymentMethods,
+            topMedicines: formattedTopSelling,
+            salesByCategory: [
+                { name: 'Antibiotics', percentage: 75, color: '#21c45d' },
+                { name: 'Painkillers', percentage: 60, color: '#e61919' },
+            ],
+            creditSales: {
+                total: creditTotal,
+                percentage: totalSales > 0 ? Math.round((creditTotal / totalSales) * 100) : 0,
+                collected: 0 // Placeholder for now
+            },
+            returns: {
+                total: returnTotal,
+                processed: returnCount,
+                percentage: totalSales > 0 ? Math.round((returnTotal / totalSales) * 100) : 0
+            },
+            quickSummary: [
+                { label: 'Period Sales', value: `Rs. ${totalSales.toLocaleString()}`, color: 'text-gray-900' },
+                { label: 'Period Profit', value: `Rs. ${totalProfit.toLocaleString()}`, color: 'text-green-600' },
+                { label: 'GST Collected', value: `Rs. ${totalGst.toLocaleString()}`, color: 'text-gray-900' },
+                { label: 'Discounts Given', value: `Rs. ${totalDiscount.toLocaleString()}`, color: 'text-purple-600' }
+            ]
+        });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// 2. Sales Trends (Charts)
+app.get('/api/reports/sales-trends', async (req, res) => {
+    try {
+        const { range, startDate, endDate } = req.query;
+        const dateQuery = getDateFilter(range, startDate, endDate);
+
+        // Daily/Monthly Trend
+        // Decide format based on range
+        let dateFormat = '%Y-%m-%d';
+        if (range === 'Year') dateFormat = '%Y-%m';
+
+        const salesTrend = await Transaction.aggregate([
+            { $match: { type: 'Sale', status: 'Posted', createdAt: dateQuery } },
+            {
+                $group: {
+                    _id: { $dateToString: { format: dateFormat, date: '$createdAt' } },
+                    sales: { $sum: '$total' },
+                    count: { $sum: 1 }
+                }
+            },
+            { $sort: { _id: 1 } }
+        ]);
+
+        const formattedTrend = salesTrend.map(t => ({
+            name: t._id, // Date label
+            sales: t.sales,
+            profit: Math.round(t.sales * 0.2) // Estimation: 20% margin for charts if real profit calc is too slow
+        }));
+
+        // Peak Hours
+        const peakHours = await Transaction.aggregate([
+            { $match: { type: 'Sale', status: 'Posted', createdAt: dateQuery } },
+            {
+                $project: {
+                    hour: { $hour: '$createdAt' },
+                    total: '$total'
+                }
+            },
+            {
+                $group: {
+                    _id: '$hour',
+                    sales: { $sum: 1 }, // Transaction count
+                    revenue: { $sum: '$total' }
+                }
+            },
+            { $sort: { _id: 1 } }
+        ]);
+
+        const formattedPeakHours = peakHours.map(p => ({
+            hour: `${p._id}:00`,
+            sales: p.sales
+        }));
+
+        res.json({
+            salesProfitTrend: formattedTrend,
+            peakHours: formattedPeakHours
+        });
+
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// 3. Inventory Health
+app.get('/api/reports/inventory-health', async (req, res) => {
+    try {
+        const medicines = await Medicine.find({ inInventory: true });
+
+        let totalRetailValue = 0;
+        let totalCostValue = 0;
+        let totalItems = 0;
+        const categoryMap = {};
+        let lowStockCount = 0;
+        let expiredCount = 0;
+        const now = new Date();
+
+        medicines.forEach(med => {
+            const stock = med.stock || 0;
+            const price = med.price || med.sellingPrice || 0;
+            const cost = med.costPrice || 0;
+
+            totalRetailValue += stock * price;
+            totalCostValue += stock * cost;
+            totalItems += stock;
+
+            // Category Stats
+            const cat = med.category || 'Uncategorized';
+            if (!categoryMap[cat]) categoryMap[cat] = 0;
+            categoryMap[cat] += stock;
+
+            // Alerts
+            if (stock <= (med.minStock || 10)) {
+                lowStockCount++;
+                console.log(`[Low Stock Alert] ${med.name}: Stock ${stock} <= Min ${med.minStock || 10}`);
+            }
+            if (med.expiryDate && new Date(med.expiryDate) < now) {
+                expiredCount++;
+                console.log(`[Expired Alert] ${med.name}: Expired on ${med.expiryDate}`);
+            }
+        });
+
+        // Fixed Colors for consistent UI
+        const categoryColors = {
+            'Antibiotics': '#ef4444', // Red
+            'Pain Relief': '#f97316', // Orange
+            'Vitamins': '#22c55e', // Green
+            'Supplements': '#3b82f6', // Blue
+            'Create': '#a855f7', // Purple
+            'Uncategorized': '#94a3b8' // Slate
+        };
+        const defaultColors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#a855f7', '#ec4899', '#6366f1'];
+
+        const categoryStock = Object.keys(categoryMap).map((key, index) => ({
+            name: key,
+            stock: categoryMap[key],
+            color: categoryColors[key] || defaultColors[index % defaultColors.length]
+        })).sort((a, b) => b.stock - a.stock).slice(0, 8); // Top 8 categories
+
+        res.json({
+            kpis: [
+                { label: 'Retail Value', value: `Rs. ${(totalRetailValue / 1000000).toFixed(2)}M`, icon: 'DollarSign' },
+                { label: 'Cost Value', value: `Rs. ${(totalCostValue / 1000000).toFixed(2)}M`, icon: 'Package' },
+                { label: 'Potential Profit', value: `Rs. ${((totalRetailValue - totalCostValue) / 1000).toFixed(1)}K`, icon: 'TrendingUp' },
+                { label: 'Unique Products', value: medicines.length, icon: 'Layers' },
+            ],
+            categoryStock,
+            alerts: [
+                { title: 'Expired Items', count: expiredCount, color: 'text-red-600 bg-red-50 border-red-100', icon: 'AlertCircle' },
+                { title: 'Low Stock', count: lowStockCount, color: 'text-orange-600 bg-orange-50 border-orange-100', icon: 'AlertCircle' },
+                { title: 'Total Stock Summary', count: `${totalItems} Units`, color: 'text-green-600 bg-green-50 border-green-100', icon: 'CheckCircle2' },
+            ]
+        });
+
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
 
 const migrateBillNumbers = async () => {
     try {
