@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Plus, Filter, Edit, Clock, AlertTriangle, ChevronDown, Download, CheckSquare, Square, ArrowUpDown, Save, MoreHorizontal, Calendar, TrendingUp, Package, DollarSign, X, AlertCircle } from 'lucide-react';
+import { Search, Plus, Filter, Edit, Clock, AlertTriangle, ChevronDown, Download, CheckSquare, Square, ArrowUpDown, Save, MoreHorizontal, Calendar, TrendingUp, Package, DollarSign, X, AlertCircle, FileText } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import AddToInventoryModal from '../components/inventory/AddToInventoryModal';
 import EditInventoryModal from '../components/inventory/EditInventoryModal';
 import API_URL from '../config/api';
@@ -32,6 +34,7 @@ const Inventory = () => {
     const [advancedFilters, setAdvancedFilters] = useState({ status: 'All', category: 'All' });
     const [editingPrice, setEditingPrice] = useState({ id: null, value: '' });
     const [enrichedLowStockItems, setEnrichedLowStockItems] = useState([]);
+    const [showExportDropdown, setShowExportDropdown] = useState(false);
     const { showToast } = useToast();
     const location = useLocation();
 
@@ -192,7 +195,7 @@ const Inventory = () => {
         }
     };
 
-    const handleExport = () => {
+    const handleExport = (format = 'excel') => {
         // Determine what data to export based on active tab
         let dataToExport = [];
         let sheetName = 'All Inventory';
@@ -211,62 +214,60 @@ const Inventory = () => {
                 sheetName = 'All Inventory';
         }
 
-        // Prepare data for Excel
-        const excelData = dataToExport.map(item => ({
-            'ID': item.id || item._id,
-            'Name': item.name,
-            'Product Name': item.name,
-            'Formula Code': item.genericName || item.formulaCode || '-',
-            'Category': item.category,
-            'Box/Shelf': item.boxNumber || '-',
-            'Stock (Packs)': (item.stock / (item.packSize || 1)).toFixed(2),
-            'Unit': item.unit,
-            'Items/Pack': item.packSize,
-            'Cost Price (Pack)': item.costPrice,
-            'MRP (Pack)': item.mrp || 0,
-            'Selling Price (Pack)': item.price,
-            'Discount %': item.discountPercentage || 0,
-            'Margin %': ((item.price - (item.costPrice || 0)) / (item.price || 1) * 100).toFixed(2) + '%', // Ensure no division by zero
-            'Total Stock Value': ((item.stock / (item.packSize || 1)) * (item.costPrice || 0)).toFixed(2),
-            'CGST %': item.cgstPercentage || 0,
-            'SGST %': item.sgstPercentage || 0,
-            'IGST %': item.igstPercentage || 0,
-            'Status': item.status,
-            'Expiry Date': item.expiryDate ? new Date(item.expiryDate).toLocaleDateString() : 'N/A',
-            'Last Updated': item.lastUpdated ? new Date(item.lastUpdated).toLocaleDateString() : '-'
-        }));
+        if (format === 'excel') {
+            // Prepare data for Excel
+            const excelData = dataToExport.map(item => ({
+                'ID': item.id || item._id,
+                'Name': item.name,
+                'Formula': item.genericName || item.formulaCode || '-',
+                'Category': item.category,
+                'Location': item.boxNumber || '-',
+                'Stock (Packs)': (item.stock / (item.packSize || 1)).toFixed(2),
+                'MRP': item.mrp || 0,
+                'Price': item.price,
+                'Status': item.status,
+                'Expiry': item.expiryDate ? new Date(item.expiryDate).toLocaleDateString() : 'N/A'
+            }));
 
-        // Create worksheet
-        const ws = XLSX.utils.json_to_sheet(excelData);
+            const ws = XLSX.utils.json_to_sheet(excelData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, sheetName);
+            const fileName = `${sheetName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
+            XLSX.writeFile(wb, fileName);
+            showToast('Exported to Excel', 'success');
+        } else {
+            // Handle PDF Export
+            const doc = new jsPDF('l', 'mm', 'a4');
+            const headers = ['Name', 'Formula', 'Category', 'Stock', 'Price', 'Expiry', 'Status'];
+            const body = dataToExport.map(item => [
+                item.name || 'N/A',
+                item.genericName || item.formulaCode || '-',
+                item.category || 'N/A',
+                ((item.stock || 0) / (item.packSize || 1)).toFixed(1),
+                (Number(item.price) || 0).toFixed(2),
+                item.expiryDate ? new Date(item.expiryDate).toLocaleDateString() : 'N/A',
+                item.status || 'Active'
+            ]);
 
-        // Set column widths for better readability
-        const colWidths = [
-            { wch: 25 }, // ID
-            { wch: 30 }, // Name
-            { wch: 15 }, // SKU
-            { wch: 15 }, // Category
-            { wch: 12 }, // Unit
-            { wch: 10 }, // Stock
-            { wch: 12 }, // Min Stock
-            { wch: 12 }, // Cost Price
-            { wch: 15 }, // Selling Price
-            { wch: 15 }, // Stock Value
-            { wch: 12 }, // Status
-            { wch: 15 }, // Expiry Date
-            { wch: 20 }  // Last Updated
-        ];
-        ws['!cols'] = colWidths;
+            doc.setFontSize(18);
+            doc.text(sheetName, 14, 22);
+            doc.setFontSize(10);
+            doc.setTextColor(100);
+            doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 30);
 
-        // Create workbook
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, sheetName);
+            autoTable(doc, {
+                head: [headers],
+                body: body,
+                startY: 40,
+                theme: 'grid',
+                headStyles: { fillColor: [0, 201, 80] },
+                styles: { fontSize: 8 }
+            });
 
-        // Generate filename with date and tab name
-        const fileName = `${sheetName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
-
-        // Export
-        XLSX.writeFile(wb, fileName);
-        showToast('Exported to Excel', 'success');
+            doc.save(`${sheetName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
+            showToast('Exported to PDF', 'success');
+        }
+        setShowExportDropdown(false);
     };
 
     // Base filter for search, barcode, and status
@@ -438,13 +439,39 @@ const Inventory = () => {
 
                 <div className="flex gap-3 w-full md:w-auto items-center">
 
-                    <button
-                        onClick={handleExport}
-                        className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-50 flex items-center gap-2"
-                    >
-                        <Download size={18} />
-                        <span>Export Excel</span>
-                    </button>
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowExportDropdown(!showExportDropdown)}
+                            className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-50 flex items-center gap-2"
+                        >
+                            <Download size={18} />
+                            <span>Export</span>
+                            <ChevronDown size={14} className={`transition-transform ${showExportDropdown ? 'rotate-180' : ''}`} />
+                        </button>
+
+                        {showExportDropdown && (
+                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-[60] animate-in fade-in slide-in-from-top-2 duration-200">
+                                <button
+                                    onClick={() => handleExport('excel')}
+                                    className="w-full px-4 py-2.5 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors"
+                                >
+                                    <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center text-green-600">
+                                        <TrendingUp size={16} />
+                                    </div>
+                                    <span>Export Excel</span>
+                                </button>
+                                <button
+                                    onClick={() => handleExport('pdf')}
+                                    className="w-full px-4 py-2.5 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors"
+                                >
+                                    <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center text-red-600">
+                                        <FileText size={16} />
+                                    </div>
+                                    <span>Export PDF</span>
+                                </button>
+                            </div>
+                        )}
+                    </div>
 
                 </div>
             </div>

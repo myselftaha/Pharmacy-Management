@@ -41,7 +41,6 @@ const NAV_SECTIONS = [
             { icon: Ticket, label: 'Vouchers', path: '/vouchers', requiresAdmin: true },
             { icon: Wallet, label: 'Cash Drawer', path: '/cash-drawer', allowedRoles: ['Admin', 'Super Admin', 'Pharmacist', 'Cashier', 'Salesman / Counter Staff'] },
             { icon: FileText, label: 'Reports', path: '/reports', requiresAdmin: true },
-            { icon: DollarSign, label: 'Expenses', path: '/expenses', requiresAdmin: true },
         ]
     }
 ];

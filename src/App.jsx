@@ -16,7 +16,6 @@ import Users from './pages/Users';
 import Customers from './pages/Customers';
 import Vouchers from './pages/Vouchers';
 import Return from './pages/Return';
-import Expenses from './pages/Expenses';
 import Report from './pages/Report';
 import Staff from './pages/Staff';
 import StaffEdit from './pages/StaffEdit';
@@ -102,7 +101,6 @@ function App() {
               <Route path="staff/:id/add-advance" element={<StaffAddAdvance />} />
               <Route path="users" element={<Users />} />
               <Route path="reports" element={<Report />} />
-              <Route path="expenses" element={<Expenses />} />
               <Route path="vouchers" element={<Vouchers />} />
               <Route path="loaders" element={<LoaderDemo />} />
             </Route>
