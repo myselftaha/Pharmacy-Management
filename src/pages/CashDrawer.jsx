@@ -419,7 +419,6 @@ const CashDrawer = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                             <MetricCard
                                 title="Opening Balance"
-                                urdu="Ibtidai"
                                 value={`Rs. ${Math.round(drawerData.openingBalance).toLocaleString()}`}
                                 icon={Wallet}
                                 iconBgClass="bg-blue-50"
@@ -427,7 +426,6 @@ const CashDrawer = () => {
                             />
                             <MetricCard
                                 title="Cash Sales"
-                                urdu="Munaah"
                                 value={`+ Rs. ${Math.round(drawerData.cashSales).toLocaleString()}`}
                                 icon={ArrowUpCircle}
                                 iconBgClass="bg-emerald-50"
@@ -436,7 +434,6 @@ const CashDrawer = () => {
                             />
                             <MetricCard
                                 title="Cash Expenses"
-                                urdu="Kharcha"
                                 value={`- Rs. ${Math.round(drawerData.cashExpenses).toLocaleString()}`}
                                 icon={ArrowDownCircle}
                                 iconBgClass="bg-rose-50"

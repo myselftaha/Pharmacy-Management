@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Mail, Phone, MapPin, Calendar as CalendarIcon } from 'lucide-react';
+import { Search, Plus, Mail, Phone, MapPin, TrendingUp, DollarSign, Clock, Users, Edit3 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import AddCustomerModal from '../components/customers/AddCustomerModal';
 import ViewCustomerModal from '../components/customers/ViewCustomerModal';
@@ -175,192 +175,226 @@ const Customers = () => {
     }, [searchQuery, customers]);
 
     return (
-        <div>
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-bold text-gray-800">Customer Management</h2>
-                <div className="flex gap-4">
-                    <div className="relative">
+        <div className="p-6 max-w-[1600px] mx-auto">
+            {/* Header Section */}
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-gray-800">Customer Management</h1>
+                    <p className="text-sm text-gray-500">Track and manage your pharmacy's customer base</p>
+                </div>
+
+                <div className="flex flex-col md:flex-row items-center gap-3 w-full lg:w-auto">
+                    <div className="relative w-full md:w-80">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                         <input
                             type="text"
-                            placeholder="Search customers"
+                            placeholder="Search by name, phone, or email..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg w-80 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
+                            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-green-500 focus:ring-4 focus:ring-green-500/5 transition-all shadow-sm"
                         />
                     </div>
+
                     <button
                         onClick={handleAddCustomer}
-                        className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg font-bold hover:bg-green-600 transition-colors shadow-lg shadow-green-500/20"
+                        className="w-full md:w-auto px-6 py-2 bg-green-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-green-500/20 hover:shadow-green-500/40 active:scale-95 transition-all flex items-center justify-center gap-2"
                     >
                         <Plus size={18} />
-                        <span>Add Customer</span>
+                        Add Customer
                     </button>
                 </div>
             </div>
 
-            {/* Date Filter Buttons */}
-            <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm mb-6">
-                <div className="flex items-center gap-3 flex-wrap">
-                    <div className="flex items-center gap-2 text-gray-600">
-                        <CalendarIcon size={20} />
-                        <span className="font-medium">Filter by Join Date:</span>
-                    </div>
-                    {[ 'Today', 'Yesterday', 'Week', 'Month', 'Custom'].map((filter) => (
-                        <button
-                            key={filter}
-                            onClick={() => handleDateFilterChange(filter)}
-                            className={`px-4 py-2 rounded-lg font-medium transition-colors ${dateFilter === filter
-                                ? 'bg-green-500 text-white shadow-lg shadow-green-500/20'
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                              }`}
-                        >
-                            {filter}
-                        </button>
-                    ))}
-                </div>
-
-                {/* Custom Date Range Picker */}
-                {dateFilter === 'Custom' && (
-                    <div className="mt-4 flex items-center gap-3 pt-4 border-t border-gray-100">
-                        <div className="flex items-center gap-2">
-                            <label className="text-sm font-medium text-gray-600">From:</label>
-                            <input
-                                type="date"
-                                value={customStartDate}
-                                onChange={(e) => setCustomStartDate(e.target.value)}
-                                className="px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
-                            />
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <label className="text-sm font-medium text-gray-600">To:</label>
-                            <input
-                                type="date"
-                                value={customEndDate}
-                                onChange={(e) => setCustomEndDate(e.target.value)}
-                                className="px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
-                            />
-                        </div>
-                        <button
-                            onClick={handleCustomDateApply}
-                            className="px-6 py-2 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors shadow-lg shadow-green-500/20"
-                        >
-                            Apply
-                        </button>
-                        <button
-                            onClick={() => {
-                                setCustomStartDate('');
-                                setCustomEndDate('');
-                                setDateFilter('Today');
-                                handleDateFilterChange('Today');
-                            }}
-                            className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg font-medium hover:bg-gray-200 transition-colors"
-                        >
-                            Clear
-                        </button>
-                    </div>
-                )}
-            </div>
-
-            {/* Stats Cards */}
-            <div className="grid grid-cols-3 gap-6 mb-8">
-                <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
-                    <div className="text-gray-500 text-sm mb-2">Total Customers</div>
-                    <div className="text-3xl font-bold text-gray-800">{filteredCustomers.length}</div>
-                </div>
-                <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
-                    <div className="text-gray-500 text-sm mb-2">Today's Customers</div>
-                    <div className="text-3xl font-bold text-green-600">
-                        {filteredCustomers.filter(c => {
+            {/* Premium KPI Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                {[
+                    {
+                        label: 'Total Customers',
+                        value: filteredCustomers.length,
+                        icon: Users,
+                        color: 'text-blue-600',
+                        bg: 'bg-blue-50',
+                        border: 'border-blue-100'
+                    },
+                    {
+                        label: "Today's New Joiners",
+                        value: filteredCustomers.filter(c => {
                             if (!c.joinDate) return false;
                             const joinDate = new Date(c.joinDate);
                             const today = new Date();
                             return joinDate.toDateString() === today.toDateString();
-                        }).length}
+                        }).length,
+                        icon: Plus,
+                        color: 'text-emerald-600',
+                        bg: 'bg-emerald-50',
+                        border: 'border-emerald-100'
+                    },
+                    {
+                        label: 'Total Revenue',
+                        value: `Rs. ${filteredCustomers.reduce((sum, c) => sum + (c.totalSpent || 0), 0).toLocaleString()}`,
+                        icon: DollarSign,
+                        color: 'text-indigo-600',
+                        bg: 'bg-indigo-50',
+                        border: 'border-indigo-100'
+                    },
+                    {
+                        label: 'High Value Customers',
+                        value: filteredCustomers.filter(c => (c.totalSpent || 0) > 1000).length,
+                        icon: TrendingUp,
+                        color: 'text-orange-600',
+                        bg: 'bg-orange-50',
+                        border: 'border-orange-100'
+                    }
+                ].map((card, idx) => (
+                    <div key={idx} className={`p-4 rounded-xl border ${card.border} ${card.bg} shadow-sm group hover:shadow-md transition-all`}>
+                        <div className="flex items-center justify-between mb-3">
+                            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">{card.label}</span>
+                            <div className={`p-2 rounded-lg bg-white/80 ${card.color} shadow-sm group-hover:scale-110 transition-transform`}>
+                                <card.icon size={18} />
+                            </div>
+                        </div>
+                        <div className={`text-2xl font-black ${card.color}`}>
+                            {card.value}
+                        </div>
                     </div>
-                </div>
-                <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
-                    <div className="text-gray-500 text-sm mb-2">Total Revenue</div>
-                    <div className="text-3xl font-bold text-gray-800">
-                        Rs. {filteredCustomers.reduce((sum, c) => sum + c.totalSpent, 0).toFixed(2)}
+                ))}
+            </div>
+
+            {/* Filter Section */}
+            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm mb-6">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                        {['Today', 'Yesterday', 'Week', 'Month', 'All Time', 'Custom'].map((filter) => (
+                            <button
+                                key={filter}
+                                onClick={() => handleDateFilterChange(filter)}
+                                className={`px-5 py-2 rounded-xl text-sm font-bold transition-all ${dateFilter === filter
+                                    ? 'bg-green-500 text-white shadow-md shadow-green-200'
+                                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                                    }`}
+                            >
+                                {filter}
+                            </button>
+                        ))}
+
+                        {dateFilter === 'Custom' && (
+                            <div className="flex items-center gap-2 ml-2 p-1 bg-gray-50 rounded-xl border border-gray-100 animate-in fade-in slide-in-from-left-2">
+                                <input
+                                    type="date"
+                                    value={customStartDate}
+                                    onChange={(e) => setCustomStartDate(e.target.value)}
+                                    className="bg-transparent px-2 py-1 text-sm outline-none font-medium"
+                                />
+                                <span className="text-gray-300">to</span>
+                                <input
+                                    type="date"
+                                    value={customEndDate}
+                                    onChange={(e) => setCustomEndDate(e.target.value)}
+                                    className="bg-transparent px-2 py-1 text-sm outline-none font-medium"
+                                />
+                                <button
+                                    onClick={handleCustomDateApply}
+                                    className="px-4 py-1.5 bg-white text-green-600 border border-green-100 rounded-lg text-xs font-bold hover:bg-green-50 transition-colors shadow-sm"
+                                >
+                                    Apply
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="text-xs font-medium text-gray-400">
+                        Join Date Filter: <span className="text-gray-900 font-bold">{dateFilter}</span>
                     </div>
                 </div>
             </div>
 
-            {/* Customers Table */}
-            <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-                <table className="w-full">
-                    <thead className="bg-gray-50 border-b border-gray-100">
+            {/* Customers Table Section */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <table className="w-full text-left">
+                    <thead className="bg-gray-50/50 border-b border-gray-200">
                         <tr>
-                            <th className="text-left px-6 py-4 text-sm font-semibold text-gray-600">Customer</th>
-                            <th className="text-left px-6 py-4 text-sm font-semibold text-gray-600">Contact</th>
-                            <th className="text-left px-6 py-4 text-sm font-semibold text-gray-600">Address</th>
-                            <th className="text-left px-6 py-4 text-sm font-semibold text-gray-600">Join Date</th>
-                            <th className="text-left px-6 py-4 text-sm font-semibold text-gray-600">Purchases</th>
-                            <th className="text-left px-6 py-4 text-sm font-semibold text-gray-600">Total Spent</th>
-                            <th className="text-left px-6 py-4 text-sm font-semibold text-gray-600">Status</th>
-                            <th className="text-left px-6 py-4 text-sm font-semibold text-gray-600">Actions</th>
+                            <th className="px-6 py-4 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Customer Profile</th>
+                            <th className="px-6 py-4 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Contact Details</th>
+                            <th className="px-6 py-4 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Address</th>
+                            <th className="px-6 py-4 text-[11px] font-bold text-gray-400 uppercase tracking-widest">History</th>
+                            <th className="px-6 py-4 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Financials</th>
+                            <th className="px-6 py-4 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
+                            <th className="px-6 py-4 text-[11px] font-bold text-gray-400 uppercase tracking-widest text-right">Actions</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-gray-50 text-sm">
                         {filteredCustomers.map((customer, index) => (
-                            <tr key={customer._id || customer.id} className={index !== filteredCustomers.length - 1 ? 'border-b border-gray-100' : ''}>
+                            <tr key={customer._id || customer.id} className="hover:bg-gray-50/50 transition-colors group">
                                 <td className="px-6 py-4">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-600 font-bold">
-                                            {customer.name.charAt(0)}
+                                        <div className="w-10 h-10 bg-gradient-to-br from-green-50 to-emerald-50 rounded-full flex items-center justify-center text-emerald-600 font-black text-xs border border-emerald-100 shadow-sm transition-transform group-hover:scale-105">
+                                            {customer.name.charAt(0).toUpperCase()}
                                         </div>
-                                        <div className="font-medium text-gray-800">{customer.name}</div>
+                                        <div>
+                                            <div className="font-bold text-gray-800">{customer.name}</div>
+                                            <div className="text-[10px] text-gray-400 flex items-center gap-1">
+                                                <Clock size={10} /> Member since {customer.joinDate || 'N/A'}
+                                            </div>
+                                        </div>
                                     </div>
                                 </td>
                                 <td className="px-6 py-4">
                                     <div className="flex flex-col gap-1">
-                                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                                            <Mail size={14} />
-                                            <span>{customer.email}</span>
+                                        <div className="flex items-center gap-2 text-xs text-gray-600 font-medium">
+                                            <div className="w-5 h-5 rounded bg-gray-50 flex items-center justify-center text-gray-400">
+                                                <Mail size={12} />
+                                            </div>
+                                            <span>{customer.email || 'No email'}</span>
                                         </div>
-                                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                                            <Phone size={14} />
-                                            <span>{customer.phone}</span>
+                                        <div className="flex items-center gap-2 text-xs text-gray-600 font-medium">
+                                            <div className="w-5 h-5 rounded bg-gray-50 flex items-center justify-center text-gray-400">
+                                                <Phone size={12} />
+                                            </div>
+                                            <span>{customer.phone || 'No phone'}</span>
                                         </div>
                                     </div>
                                 </td>
                                 <td className="px-6 py-4">
-                                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                                        <MapPin size={14} />
-                                        <span>{customer.address}</span>
+                                    <div className="flex items-center gap-2 text-xs text-gray-600 font-medium">
+                                        <MapPin size={14} className="text-gray-400" />
+                                        <span className="max-w-[150px] truncate">{customer.address || 'N/A'}</span>
                                     </div>
                                 </td>
                                 <td className="px-6 py-4">
-                                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                                        <CalendarIcon size={14} />
-                                        <span>{customer.joinDate}</span>
+                                    <div className="flex flex-col">
+                                        <span className="text-gray-800 font-bold">{customer.totalPurchases || 0}</span>
+                                        <span className="text-[10px] text-gray-400 font-medium uppercase tracking-tight">Total Orders</span>
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4 text-emerald-600">
+                                    <div className="flex flex-col">
+                                        <span className="text-gray-900 font-black">Rs. {(customer.totalSpent || 0).toLocaleString()}</span>
+                                        <span className="text-[10px] text-emerald-500 font-bold uppercase tracking-tight">Total Spent</span>
                                     </div>
                                 </td>
                                 <td className="px-6 py-4">
-                                    <span className="text-gray-800 font-medium">{customer.totalPurchases}</span>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <span className="text-gray-800 font-bold">Rs. {customer.totalSpent.toFixed(2)}</span>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
-                                        {customer.status}
+                                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider shadow-sm border ${customer.status === 'Active'
+                                        ? 'bg-green-100 text-green-700 border-green-200'
+                                        : 'bg-gray-100 text-gray-500 border-gray-200'
+                                        }`}>
+                                        {customer.status || 'Active'}
                                     </span>
                                 </td>
-                                <td className="px-6 py-4">
-                                    <div className="flex gap-2">
+                                <td className="px-6 py-4 text-right">
+                                    <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <button
                                             onClick={() => handleViewCustomer(customer)}
-                                            className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                                            className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                                            title="View Profile"
                                         >
-                                            View
+                                            <Search size={14} />
                                         </button>
                                         <button
                                             onClick={() => handleEditCustomer(customer)}
-                                            className="text-green-600 hover:text-green-700 text-sm font-medium"
+                                            className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
+                                            title="Edit Details"
                                         >
-                                            Edit
+                                            <Edit3 size={14} />
                                         </button>
                                     </div>
                                 </td>
@@ -368,10 +402,20 @@ const Customers = () => {
                         ))}
                     </tbody>
                 </table>
+                {filteredCustomers.length === 0 && (
+                    <div className="py-20 text-center">
+                        <div className="inline-flex p-4 bg-gray-50 rounded-full text-gray-400 mb-4 font-black text-2xl">
+                            ?
+                        </div>
+                        <h3 className="text-gray-800 font-bold">No customers found</h3>
+                        <p className="text-gray-500 text-sm">Try adjusting your search or filters</p>
+                    </div>
+                )}
             </div>
 
-            <div className="mt-4 text-sm text-gray-500">
-                Showing {filteredCustomers.length} of {customers.length} customers
+            <div className="mt-4 flex items-center justify-between text-[11px] font-bold text-gray-400 uppercase tracking-widest px-2">
+                <span>Displaying {filteredCustomers.length} Profile(s)</span>
+                <span>Active Database: {customers.length} Entries</span>
             </div>
 
             <AddCustomerModal
