@@ -61,11 +61,11 @@ const Staff = () => {
     });
 
     const ROLES = [
-        'Owner / Malik',
+        'Owner',
         'Pharmacist',
         'Counter Salesman',
         'Store Manager',
-        'Accountant / Munshi',
+        'Accountant',
         'Helper / Peon'
     ];
 
@@ -227,11 +227,11 @@ const Staff = () => {
 
     const getRoleBadgeColor = (role) => {
         const colors = {
-            'Owner / Malik': 'bg-cyan-100 text-cyan-700 border-cyan-200',
+            'Owner': 'bg-cyan-100 text-cyan-700 border-cyan-200',
             'Pharmacist': 'bg-blue-100 text-blue-700 border-blue-200',
             'Counter Salesman': 'bg-purple-100 text-purple-700 border-purple-200',
             'Store Manager': 'bg-indigo-100 text-indigo-700 border-indigo-200',
-            'Accountant / Munshi': 'bg-orange-100 text-orange-700 border-orange-200',
+            'Accountant': 'bg-orange-100 text-orange-700 border-orange-200',
             'Helper / Peon': 'bg-green-100 text-green-700 border-green-200'
         };
         return colors[role] || 'bg-gray-100 text-gray-700 border-gray-200';
@@ -340,6 +340,76 @@ const Staff = () => {
         totalSalary: staff.filter(s => s.status === 'Active').reduce((sum, s) => sum + (s.baseSalary || 0), 0),
         roles: [...new Set(staff.map(s => s.role))].length
     };
+
+    // Role Permissions Data
+    const ROLE_PERMISSIONS = [
+        {
+            role: 'Owner',
+            badgeColor: 'bg-green-100 text-green-700 border-green-200', // Green as per image
+            permissions: [
+                { label: 'Full system access', allowed: true },
+                { label: 'Manage staff & roles', allowed: true },
+                { label: 'View all reports', allowed: true },
+                { label: 'Settings & configuration', allowed: true },
+                { label: 'Financial management', allowed: true }
+            ]
+        },
+        {
+            role: 'Pharmacist',
+            badgeColor: 'bg-teal-50 text-teal-700 border-teal-200', // Light Blue/Teal as per image
+            permissions: [
+                { label: 'POS & billing', allowed: true },
+                { label: 'Inventory management', allowed: true },
+                { label: 'Prescription verification', allowed: true },
+                { label: 'Controlled medicines', allowed: true },
+                { label: 'Basic reports', allowed: true }
+            ]
+        },
+        {
+            role: 'Counter Salesman',
+            badgeColor: 'bg-gray-100 text-gray-700 border-gray-200',
+            permissions: [
+                { label: 'POS & billing only', allowed: true },
+                { label: 'View medicine stock', allowed: true },
+                { label: 'No inventory edits', allowed: false },
+                { label: 'No controlled medicines', allowed: false },
+                { label: 'No reports access', allowed: false }
+            ]
+        },
+        {
+            role: 'Store Manager',
+            badgeColor: 'bg-teal-100 text-teal-700 border-teal-200', // Stronger Teal
+            permissions: [
+                { label: 'POS & billing', allowed: true },
+                { label: 'Inventory management', allowed: true },
+                { label: 'Staff management', allowed: true },
+                { label: 'Distributor management', allowed: true },
+                { label: 'Most reports', allowed: true }
+            ]
+        },
+        {
+            role: 'Accountant',
+            badgeColor: 'bg-orange-100 text-orange-700 border-orange-200',
+            permissions: [
+                { label: 'Financial reports', allowed: true },
+                { label: 'Distributor ledgers', allowed: true },
+                { label: 'GST & tax reports', allowed: true },
+                { label: 'Salary management', allowed: true },
+                { label: 'No POS access', allowed: false }
+            ]
+        },
+        {
+            role: 'Helper / Peon',
+            badgeColor: 'bg-gray-100 text-gray-700 border-gray-200',
+            permissions: [
+                { label: 'Stock checking', allowed: true },
+                { label: 'Medicine delivery', allowed: true },
+                { label: 'No billing access', allowed: false },
+                { label: 'No system access', allowed: false },
+                { label: 'No reports', allowed: false }
+            ]
+        }
+    ];
 
     if (loading) {
         return (
@@ -642,6 +712,37 @@ const Staff = () => {
                     </div>
                 )
             }
+
+            {/* Role Permissions Section */}
+            <div className="bg-white rounded-xl p-8 border border-gray-200 mt-8 mb-8">
+                <div className="flex items-center gap-3 mb-2">
+                    <Shield className="text-sm text-green-600" size={24} />
+                    <h2 className="text-xl font-bold text-gray-900">Role Permissions</h2>
+                </div>
+                <p className="text-gray-500 mb-6 text-sm">Overview of access levels for each role in Pakistani pharmacy</p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {ROLE_PERMISSIONS.map((role, idx) => (
+                        <div key={idx} className="border border-gray-200 rounded-xl p-5 hover:shadow-md transition-shadow bg-white">
+                            <span className={`px-3 py-1 rounded-full text-xs font-bold border ${role.badgeColor} inline-block mb-4`}>
+                                {role.role}
+                            </span>
+                            <div className="space-y-3">
+                                {role.permissions.map((perm, pIdx) => (
+                                    <div key={pIdx} className="flex items-start gap-2 text-sm text-gray-600">
+                                        {perm.allowed ? (
+                                            <Check className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+                                        ) : (
+                                            <X className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                                        )}
+                                        <span className={!perm.allowed ? "text-gray-400" : ""}>{perm.label}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
 
             {/* Add Staff Modal */}
             {
