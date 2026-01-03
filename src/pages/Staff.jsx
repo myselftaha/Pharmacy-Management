@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
     Users, UserCheck, Briefcase, DollarSign, Shield,
     Search, Download, Plus, Phone, Mail, MapPin, Calendar,
-    MoreVertical, Edit, Trash2, X, Check
+    MoreVertical, Edit, Trash2, X, Check, History
 } from 'lucide-react';
 import axios from 'axios';
 import API_URL from '../config/api';
@@ -23,6 +23,8 @@ const Staff = () => {
     const [activeDropdown, setActiveDropdown] = useState(null);
     const [selectedStaff, setSelectedStaff] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
+    const [showHistoryModal, setShowHistoryModal] = useState(false);
+    const [paymentHistory, setPaymentHistory] = useState([]);
 
     const [salaryData, setSalaryData] = useState({
         periodStart: '',
@@ -159,6 +161,19 @@ const Staff = () => {
             fetchStaff();
         } catch (error) {
             showToast(error.response?.data?.message || 'Failed to record salary advance', 'error');
+        }
+    };
+
+    const fetchPaymentHistory = async (staffId) => {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await axios.get(`${API_URL}/api/staff/${staffId}/payments`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setPaymentHistory(response.data);
+            setShowHistoryModal(true);
+        } catch (error) {
+            showToast('Failed to fetch payment history', 'error');
         }
     };
 
@@ -442,6 +457,16 @@ const Staff = () => {
                                         <button
                                             onClick={() => {
                                                 setSelectedStaff(member);
+                                                fetchPaymentHistory(member._id);
+                                                setActiveDropdown(null);
+                                            }}
+                                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                        >
+                                            <History size={14} /> View History
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setSelectedStaff(member);
                                                 setShowSalaryModal(true);
                                                 setActiveDropdown(null);
                                             }}
@@ -475,7 +500,20 @@ const Staff = () => {
                             </div>
                         </div>
 
+
+
                         <div className="space-y-2 mb-4">
+                            <div className="flex items-center justify-between text-sm">
+                                <span className={`px-2 py-0.5 rounded text-xs font-medium border ${member.salaryStatus === 'Paid' ? 'bg-green-100 text-green-700 border-green-200' :
+                                    member.salaryStatus === 'Partially Paid' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
+                                        'bg-red-100 text-red-700 border-red-200'
+                                    }`}>
+                                    {member.salaryStatus || 'Unpaid'}
+                                </span>
+                                {member.pendingSalary > 0 && (
+                                    <span className="text-red-600 font-medium text-xs">Due: Rs {member.pendingSalary.toLocaleString()}</span>
+                                )}
+                            </div>
                             <div className="flex items-center gap-2 text-sm text-gray-600">
                                 <Phone size={14} />
                                 <span>{member.phone}</span>
@@ -506,424 +544,507 @@ const Staff = () => {
                 ))}
             </div>
 
-            {filteredStaff.length === 0 && (
-                <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
-                    <Users className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-1">No staff members found</h3>
-                    <p className="text-gray-500">Try adjusting your search or filters</p>
-                </div>
-            )}
+            {
+                filteredStaff.length === 0 && (
+                    <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
+                        <Users className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                        <h3 className="text-lg font-medium text-gray-900 mb-1">No staff members found</h3>
+                        <p className="text-gray-500">Try adjusting your search or filters</p>
+                    </div>
+                )
+            }
 
             {/* Add Staff Modal */}
-            {showAddModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-                        <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex justify-between items-center">
-                            <div>
-                                <h2 className="text-2xl font-bold text-gray-900">Add New Staff</h2>
-                                <p className="text-gray-600 text-sm mt-1">Add a new employee to the pharmacy</p>
-                            </div>
-                            <button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-gray-600">
-                                <X size={24} />
-                            </button>
-                        </div>
-
-                        <div className="p-6 space-y-6">
-                            {/* Personal Information */}
-                            <div>
-                                <h3 className="font-semibold text-gray-900 mb-4">Personal Information</h3>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Full Name <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={formData.name}
-                                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                            placeholder="Enter full name"
-                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Father's Name <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={formData.fatherName}
-                                            onChange={(e) => setFormData({ ...formData, fatherName: e.target.value })}
-                                            placeholder="Father's name"
-                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            CNIC Number <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={formData.cnic}
-                                            onChange={(e) => setFormData({ ...formData, cnic: e.target.value })}
-                                            placeholder="35201-1234567-1"
-                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Phone Number <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={formData.phone}
-                                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                            placeholder="0321-1234567"
-                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                                        />
-                                    </div>
-                                    <div className="col-span-2">
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Email (Optional)
-                                        </label>
-                                        <input
-                                            type="email"
-                                            value={formData.email}
-                                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                            placeholder="staff@pharmacy.pk"
-                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Address <span className="text-red-500">*</span>
-                                        </label>
-                                        <textarea
-                                            value={formData.address}
-                                            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                                            placeholder="Full address"
-                                            rows="3"
-                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            City <span className="text-red-500">*</span>
-                                        </label>
-                                        <select
-                                            value={formData.city}
-                                            onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                                        >
-                                            {CITIES.map(city => (
-                                                <option key={city} value={city}>{city}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Employment Details */}
-                            <div>
-                                <h3 className="font-semibold text-gray-900 mb-4">Employment Details</h3>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Role / Position <span className="text-red-500">*</span>
-                                        </label>
-                                        <select
-                                            value={formData.role}
-                                            onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                                        >
-                                            {ROLES.map(role => (
-                                                <option key={role} value={role}>{role}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Employment Type <span className="text-red-500">*</span>
-                                        </label>
-                                        <select
-                                            value={formData.employmentType}
-                                            onChange={(e) => setFormData({ ...formData, employmentType: e.target.value })}
-                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                                        >
-                                            {EMPLOYMENT_TYPES.map(type => (
-                                                <option key={type} value={type}>{type}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Shift <span className="text-red-500">*</span>
-                                        </label>
-                                        <select
-                                            value={formData.shift}
-                                            onChange={(e) => setFormData({ ...formData, shift: e.target.value })}
-                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                                        >
-                                            {SHIFTS.map(shift => (
-                                                <option key={shift} value={shift}>{shift}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Monthly Salary (PKR) <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="number"
-                                            value={formData.baseSalary}
-                                            onChange={(e) => setFormData({ ...formData, baseSalary: e.target.value })}
-                                            placeholder="25000"
-                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                                        />
-                                    </div>
-                                    <div className="col-span-2">
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Joining Date <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="date"
-                                            value={formData.joiningDate}
-                                            onChange={(e) => setFormData({ ...formData, joiningDate: e.target.value })}
-                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Emergency Contact */}
-                            <div>
-                                <h3 className="font-semibold text-gray-900 mb-4">Emergency Contact (Optional)</h3>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Contact Name
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={formData.emergencyContactName}
-                                            onChange={(e) => setFormData({ ...formData, emergencyContactName: e.target.value })}
-                                            placeholder="Emergency contact name"
-                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Contact Phone
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={formData.emergencyContactPhone}
-                                            onChange={(e) => setFormData({ ...formData, emergencyContactPhone: e.target.value })}
-                                            placeholder="0300-1234567"
-                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Account Status */}
-                            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            {
+                showAddModal && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                            <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex justify-between items-center">
                                 <div>
-                                    <p className="font-semibold text-gray-900">Account Status</p>
-                                    <p className="text-sm text-gray-600">Staff member is currently active</p>
+                                    <h2 className="text-2xl font-bold text-gray-900">Add New Staff</h2>
+                                    <p className="text-gray-600 text-sm mt-1">Add a new employee to the pharmacy</p>
                                 </div>
-                                <button
-                                    onClick={() => setFormData({ ...formData, status: formData.status === 'Active' ? 'Deactivated' : 'Active' })}
-                                    className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${formData.status === 'Active' ? 'bg-teal-500' : 'bg-gray-300'
-                                        }`}
-                                >
-                                    <span
-                                        className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${formData.status === 'Active' ? 'translate-x-6' : 'translate-x-1'
+                                <button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-gray-600">
+                                    <X size={24} />
+                                </button>
+                            </div>
+
+                            <div className="p-6 space-y-6">
+                                {/* Personal Information */}
+                                <div>
+                                    <h3 className="font-semibold text-gray-900 mb-4">Personal Information</h3>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Full Name <span className="text-red-500">*</span>
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={formData.name}
+                                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                                placeholder="Enter full name"
+                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Father's Name <span className="text-red-500">*</span>
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={formData.fatherName}
+                                                onChange={(e) => setFormData({ ...formData, fatherName: e.target.value })}
+                                                placeholder="Father's name"
+                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                CNIC Number <span className="text-red-500">*</span>
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={formData.cnic}
+                                                onChange={(e) => setFormData({ ...formData, cnic: e.target.value })}
+                                                placeholder="35201-1234567-1"
+                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Phone Number <span className="text-red-500">*</span>
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={formData.phone}
+                                                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                                placeholder="0321-1234567"
+                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                            />
+                                        </div>
+                                        <div className="col-span-2">
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Email (Optional)
+                                            </label>
+                                            <input
+                                                type="email"
+                                                value={formData.email}
+                                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                                placeholder="staff@pharmacy.pk"
+                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Address <span className="text-red-500">*</span>
+                                            </label>
+                                            <textarea
+                                                value={formData.address}
+                                                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                                                placeholder="Full address"
+                                                rows="3"
+                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                City <span className="text-red-500">*</span>
+                                            </label>
+                                            <select
+                                                value={formData.city}
+                                                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                            >
+                                                {CITIES.map(city => (
+                                                    <option key={city} value={city}>{city}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Employment Details */}
+                                <div>
+                                    <h3 className="font-semibold text-gray-900 mb-4">Employment Details</h3>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Role / Position <span className="text-red-500">*</span>
+                                            </label>
+                                            <select
+                                                value={formData.role}
+                                                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                            >
+                                                {ROLES.map(role => (
+                                                    <option key={role} value={role}>{role}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Employment Type <span className="text-red-500">*</span>
+                                            </label>
+                                            <select
+                                                value={formData.employmentType}
+                                                onChange={(e) => setFormData({ ...formData, employmentType: e.target.value })}
+                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                            >
+                                                {EMPLOYMENT_TYPES.map(type => (
+                                                    <option key={type} value={type}>{type}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Shift <span className="text-red-500">*</span>
+                                            </label>
+                                            <select
+                                                value={formData.shift}
+                                                onChange={(e) => setFormData({ ...formData, shift: e.target.value })}
+                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                            >
+                                                {SHIFTS.map(shift => (
+                                                    <option key={shift} value={shift}>{shift}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Monthly Salary (PKR) <span className="text-red-500">*</span>
+                                            </label>
+                                            <input
+                                                type="number"
+                                                value={formData.baseSalary}
+                                                onChange={(e) => setFormData({ ...formData, baseSalary: e.target.value })}
+                                                placeholder="25000"
+                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                            />
+                                        </div>
+                                        <div className="col-span-2">
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Joining Date <span className="text-red-500">*</span>
+                                            </label>
+                                            <input
+                                                type="date"
+                                                value={formData.joiningDate}
+                                                onChange={(e) => setFormData({ ...formData, joiningDate: e.target.value })}
+                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Emergency Contact */}
+                                <div>
+                                    <h3 className="font-semibold text-gray-900 mb-4">Emergency Contact (Optional)</h3>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Contact Name
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={formData.emergencyContactName}
+                                                onChange={(e) => setFormData({ ...formData, emergencyContactName: e.target.value })}
+                                                placeholder="Emergency contact name"
+                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Contact Phone
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={formData.emergencyContactPhone}
+                                                onChange={(e) => setFormData({ ...formData, emergencyContactPhone: e.target.value })}
+                                                placeholder="0300-1234567"
+                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Account Status */}
+                                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                    <div>
+                                        <p className="font-semibold text-gray-900">Account Status</p>
+                                        <p className="text-sm text-gray-600">Staff member is currently active</p>
+                                    </div>
+                                    <button
+                                        onClick={() => setFormData({ ...formData, status: formData.status === 'Active' ? 'Deactivated' : 'Active' })}
+                                        className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${formData.status === 'Active' ? 'bg-teal-500' : 'bg-gray-300'
                                             }`}
-                                    />
+                                    >
+                                        <span
+                                            className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${formData.status === 'Active' ? 'translate-x-6' : 'translate-x-1'
+                                                }`}
+                                        />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="sticky bottom-0 bg-white border-t border-gray-200 p-6 flex justify-end gap-3">
+                                <button
+                                    onClick={() => setShowAddModal(false)}
+                                    className="px-6 py-2.5 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleAddStaff}
+                                    className="px-6 py-2.5 bg-teal-500 text-white rounded-lg font-medium hover:bg-teal-600"
+                                >
+                                    Add Staff
                                 </button>
                             </div>
                         </div>
-
-                        <div className="sticky bottom-0 bg-white border-t border-gray-200 p-6 flex justify-end gap-3">
-                            <button
-                                onClick={() => setShowAddModal(false)}
-                                className="px-6 py-2.5 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleAddStaff}
-                                className="px-6 py-2.5 bg-teal-500 text-white rounded-lg font-medium hover:bg-teal-600"
-                            >
-                                Add Staff
-                            </button>
-                        </div>
                     </div>
-                </div>
-            )}
+                )
+            }
             {/* Delete Confirmation Modal */}
-            {showDeleteModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-md p-6">
-                        <div className="text-center">
-                            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100 mb-4">
-                                <Trash2 className="h-6 w-6 text-red-600" />
+            {
+                showDeleteModal && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+                        <div className="bg-white rounded-2xl w-full max-w-md p-6">
+                            <div className="text-center">
+                                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100 mb-4">
+                                    <Trash2 className="h-6 w-6 text-red-600" />
+                                </div>
+                                <h3 className="text-lg font-bold text-gray-900">Delete Staff Member</h3>
+                                <p className="text-sm text-gray-500 mt-2">
+                                    Are you sure you want to delete <strong>{selectedStaff?.name}</strong>? This action cannot be undone and all historical data for this member will be permanently removed.
+                                </p>
                             </div>
-                            <h3 className="text-lg font-bold text-gray-900">Delete Staff Member</h3>
-                            <p className="text-sm text-gray-500 mt-2">
-                                Are you sure you want to delete <strong>{selectedStaff?.name}</strong>? This action cannot be undone and all historical data for this member will be permanently removed.
-                            </p>
-                        </div>
-                        <div className="mt-6 flex gap-3">
-                            <button
-                                onClick={() => setShowDeleteModal(false)}
-                                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleDeleteStaff}
-                                className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700"
-                            >
-                                Delete
-                            </button>
+                            <div className="mt-6 flex gap-3">
+                                <button
+                                    onClick={() => setShowDeleteModal(false)}
+                                    className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleDeleteStaff}
+                                    className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700"
+                                >
+                                    Delete
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Pay Salary Modal */}
-            {showSalaryModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden">
-                        <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-                            <h2 className="text-xl font-bold text-gray-900">Pay Salary - {selectedStaff?.name}</h2>
-                            <button onClick={() => setShowSalaryModal(false)} className="text-gray-400 hover:text-gray-600">
-                                <X size={20} />
-                            </button>
-                        </div>
-                        <div className="p-6 space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Period Start</label>
-                                    <input
-                                        type="date"
-                                        value={salaryData.periodStart}
-                                        onChange={(e) => setSalaryData({ ...salaryData, periodStart: e.target.value })}
-                                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
-                                    />
+            {
+                showSalaryModal && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+                        <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden">
+                            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                                <h2 className="text-xl font-bold text-gray-900">Pay Salary - {selectedStaff?.name}</h2>
+                                <button onClick={() => setShowSalaryModal(false)} className="text-gray-400 hover:text-gray-600">
+                                    <X size={20} />
+                                </button>
+                            </div>
+                            <div className="p-6 space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Period Start</label>
+                                        <input
+                                            type="date"
+                                            value={salaryData.periodStart}
+                                            onChange={(e) => setSalaryData({ ...salaryData, periodStart: e.target.value })}
+                                            className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Period End</label>
+                                        <input
+                                            type="date"
+                                            value={salaryData.periodEnd}
+                                            onChange={(e) => setSalaryData({ ...salaryData, periodEnd: e.target.value })}
+                                            className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
+                                        />
+                                    </div>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Period End</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Amount to Pay (PKR)</label>
                                     <input
-                                        type="date"
-                                        value={salaryData.periodEnd}
-                                        onChange={(e) => setSalaryData({ ...salaryData, periodEnd: e.target.value })}
-                                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
+                                        type="number"
+                                        readOnly
+                                        value={selectedStaff?.baseSalary}
+                                        className="w-full px-4 py-2 bg-gray-50 border rounded-lg text-gray-600"
                                     />
+                                    <p className="text-[10px] text-gray-500 mt-1">Base monthly salary from profile</p>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
+                                    <select
+                                        value={salaryData.paymentMethod}
+                                        onChange={(e) => setSalaryData({ ...salaryData, paymentMethod: e.target.value })}
+                                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
+                                    >
+                                        <option value="Cash">Cash</option>
+                                        <option value="Bank">Bank Transfer</option>
+                                        <option value="EasyPaisa">EasyPaisa</option>
+                                        <option value="JazzCash">JazzCash</option>
+                                    </select>
                                 </div>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Amount to Pay (PKR)</label>
-                                <input
-                                    type="number"
-                                    readOnly
-                                    value={selectedStaff?.baseSalary}
-                                    className="w-full px-4 py-2 bg-gray-50 border rounded-lg text-gray-600"
-                                />
-                                <p className="text-[10px] text-gray-500 mt-1">Base monthly salary from profile</p>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
-                                <select
-                                    value={salaryData.paymentMethod}
-                                    onChange={(e) => setSalaryData({ ...salaryData, paymentMethod: e.target.value })}
-                                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
+                            <div className="p-6 bg-gray-50 flex justify-end gap-3">
+                                <button
+                                    onClick={() => setShowSalaryModal(false)}
+                                    className="px-4 py-2 text-gray-600 font-medium"
                                 >
-                                    <option value="Cash">Cash</option>
-                                    <option value="Bank">Bank Transfer</option>
-                                    <option value="EasyPaisa">EasyPaisa</option>
-                                    <option value="JazzCash">JazzCash</option>
-                                </select>
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handlePaySalary}
+                                    className="px-6 py-2 bg-teal-500 text-white rounded-lg font-medium hover:bg-teal-600"
+                                >
+                                    Confirm Payment
+                                </button>
                             </div>
-                        </div>
-                        <div className="p-6 bg-gray-50 flex justify-end gap-3">
-                            <button
-                                onClick={() => setShowSalaryModal(false)}
-                                className="px-4 py-2 text-gray-600 font-medium"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handlePaySalary}
-                                className="px-6 py-2 bg-teal-500 text-white rounded-lg font-medium hover:bg-teal-600"
-                            >
-                                Confirm Payment
-                            </button>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Add Advance Modal */}
-            {showAdvanceModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden">
-                        <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-                            <h2 className="text-xl font-bold text-gray-900">Add Advance - {selectedStaff?.name}</h2>
-                            <button onClick={() => setShowAdvanceModal(false)} className="text-gray-400 hover:text-gray-600">
-                                <X size={20} />
+            {
+                showAdvanceModal && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+                        <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden">
+                            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                                <h2 className="text-xl font-bold text-gray-900">Add Advance - {selectedStaff?.name}</h2>
+                                <button onClick={() => setShowAdvanceModal(false)} className="text-gray-400 hover:text-gray-600">
+                                    <X size={20} />
+                                </button>
+                            </div>
+                            <div className="p-6 space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Advance Amount (PKR)</label>
+                                    <input
+                                        type="number"
+                                        value={advanceData.amount}
+                                        onChange={(e) => setAdvanceData({ ...advanceData, amount: e.target.value })}
+                                        placeholder="Enter amount"
+                                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                                    <input
+                                        type="date"
+                                        value={advanceData.date}
+                                        onChange={(e) => setAdvanceData({ ...advanceData, date: e.target.value })}
+                                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Note / Reason</label>
+                                    <textarea
+                                        value={advanceData.note}
+                                        onChange={(e) => setAdvanceData({ ...advanceData, note: e.target.value })}
+                                        placeholder="e.g. Medical emergency, Loan"
+                                        rows="3"
+                                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none resize-none"
+                                    />
+                                </div>
+                            </div>
+                            <div className="p-6 bg-gray-50 flex justify-end gap-3">
+                                <button
+                                    onClick={() => setShowAdvanceModal(false)}
+                                    className="px-4 py-2 text-gray-600 font-medium"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleAddAdvance}
+                                    className="px-6 py-2 bg-orange-500 text-white rounded-lg font-medium hover:bg-orange-600"
+                                >
+                                    Record Advance
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+
+            {/* Salary History Modal */}
+            {showHistoryModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70] p-4">
+                    <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+                        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                            <div>
+                                <h2 className="text-xl font-bold text-gray-900">Salary History</h2>
+                                <p className="text-sm text-gray-500">{selectedStaff?.name}</p>
+                            </div>
+                            <button onClick={() => setShowHistoryModal(false)} className="text-gray-400 hover:text-gray-600">
+                                <X size={24} />
                             </button>
                         </div>
-                        <div className="p-6 space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Advance Amount (PKR)</label>
-                                <input
-                                    type="number"
-                                    value={advanceData.amount}
-                                    onChange={(e) => setAdvanceData({ ...advanceData, amount: e.target.value })}
-                                    placeholder="Enter amount"
-                                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                                <input
-                                    type="date"
-                                    value={advanceData.date}
-                                    onChange={(e) => setAdvanceData({ ...advanceData, date: e.target.value })}
-                                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Note / Reason</label>
-                                <textarea
-                                    value={advanceData.note}
-                                    onChange={(e) => setAdvanceData({ ...advanceData, note: e.target.value })}
-                                    placeholder="e.g. Medical emergency, Loan"
-                                    rows="3"
-                                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none resize-none"
-                                />
-                            </div>
+                        <div className="flex-1 overflow-auto p-0">
+                            <table className="w-full">
+                                <thead className="bg-gray-50 sticky top-0">
+                                    <tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        <th className="px-6 py-3">Date</th>
+                                        <th className="px-6 py-3">Period</th>
+                                        <th className="px-6 py-3">Amount</th>
+                                        <th className="px-6 py-3">Type</th>
+                                        <th className="px-6 py-3">Method</th>
+                                        <th className="px-6 py-3">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200">
+                                    {paymentHistory.length > 0 ? (
+                                        paymentHistory.map((payment) => (
+                                            <tr key={payment._id} className="hover:bg-gray-50">
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                    {new Date(payment.paymentDate).toLocaleDateString()}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                    {new Date(payment.periodStart).toLocaleDateString()} - {new Date(payment.periodEnd).toLocaleDateString()}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                                    Rs {payment.finalPayable.toLocaleString()}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                    Salary
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                    {payment.paymentMethod}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                                        {payment.status}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
+                                                No payment history found
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
-                        <div className="p-6 bg-gray-50 flex justify-end gap-3">
+                        <div className="p-4 border-t border-gray-100 text-right">
                             <button
-                                onClick={() => setShowAdvanceModal(false)}
-                                className="px-4 py-2 text-gray-600 font-medium"
+                                onClick={() => setShowHistoryModal(false)}
+                                className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium"
                             >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleAddAdvance}
-                                className="px-6 py-2 bg-orange-500 text-white rounded-lg font-medium hover:bg-orange-600"
-                            >
-                                Record Advance
+                                Close
                             </button>
                         </div>
                     </div>
                 </div>
             )}
-        </div>
+        </div >
     );
 };
 
