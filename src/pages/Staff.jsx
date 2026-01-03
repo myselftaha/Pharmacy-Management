@@ -4,6 +4,8 @@ import {
     Search, Download, Plus, Phone, Mail, MapPin, Calendar,
     MoreVertical, Edit, Trash2, X, Check, History
 } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import axios from 'axios';
 import API_URL from '../config/api';
 import { useToast } from '../context/ToastContext';
@@ -225,7 +227,7 @@ const Staff = () => {
 
     const getRoleBadgeColor = (role) => {
         const colors = {
-            'Owner / Malik': 'bg-teal-100 text-teal-700 border-teal-200',
+            'Owner / Malik': 'bg-cyan-100 text-cyan-700 border-cyan-200',
             'Pharmacist': 'bg-blue-100 text-blue-700 border-blue-200',
             'Counter Salesman': 'bg-purple-100 text-purple-700 border-purple-200',
             'Store Manager': 'bg-indigo-100 text-indigo-700 border-indigo-200',
@@ -241,6 +243,72 @@ const Staff = () => {
         if (shift.includes('Evening')) return 'Evening';
         if (shift.includes('Night')) return 'Night';
         return 'Full Day';
+    };
+
+    const [showExportMenu, setShowExportMenu] = useState(false);
+
+    // ... existing init ...
+
+    // Export Functions
+    const downloadCSV = () => {
+        const headers = ['Name', 'Role', 'Phone', 'Email', 'City', 'Shift', 'Status', 'Salary'];
+        const data = filteredStaff.map(member => [
+            member.name,
+            member.role,
+            member.phone,
+            member.email,
+            member.city,
+            member.shift || 'Full Day',
+            member.status,
+            member.baseSalary
+        ]);
+
+        const csvContent = [
+            headers.join(','),
+            ...data.map(row => row.map(cell => `"${cell || ''}"`).join(','))
+        ].join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', 'staff_list.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setShowExportMenu(false);
+    };
+
+    const downloadPDF = () => {
+        const doc = new jsPDF();
+
+        doc.setFontSize(18);
+        doc.text('Staff List', 14, 22);
+        doc.setFontSize(11);
+        doc.setTextColor(100);
+        doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 30);
+
+        const tableColumn = ["Name", "Role", "Phone", "Shift", "Status", "Salary"];
+        const tableRows = filteredStaff.map(member => [
+            member.name,
+            member.role,
+            member.phone,
+            member.shift || 'Full Day',
+            member.status,
+            member.baseSalary
+        ]);
+
+        autoTable(doc, {
+            head: [tableColumn],
+            body: tableRows,
+            startY: 40,
+            theme: 'grid',
+            headStyles: { fillColor: [22, 163, 74] }, // green-600
+            alternateRowStyles: { fillColor: [240, 253, 244] } // green-50
+        });
+
+        doc.save('staff_list.pdf');
+        setShowExportMenu(false);
     };
 
     const getInitials = (name) => {
@@ -276,7 +344,7 @@ const Staff = () => {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-screen">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500"></div>
             </div>
         );
     }
@@ -290,13 +358,34 @@ const Staff = () => {
                     <p className="text-gray-600 mt-1">Manage pharmacy employees, shifts, and salaries</p>
                 </div>
                 <div className="flex gap-3">
-                    <button className="px-4 py-2 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2">
-                        <Download size={18} />
-                        Export
-                    </button>
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowExportMenu(!showExportMenu)}
+                            className="px-4 py-2 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                        >
+                            <Download size={18} />
+                            Export
+                        </button>
+                        {showExportMenu && (
+                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-100 z-50 py-1">
+                                <button
+                                    onClick={downloadCSV}
+                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-green-600"
+                                >
+                                    Export as CSV
+                                </button>
+                                <button
+                                    onClick={downloadPDF}
+                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-green-600"
+                                >
+                                    Export as PDF
+                                </button>
+                            </div>
+                        )}
+                    </div>
                     <button
                         onClick={() => setShowAddModal(true)}
-                        className="px-4 py-2 bg-teal-500 text-white rounded-lg font-medium hover:bg-teal-600 flex items-center gap-2"
+                        className="px-4 py-2 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 flex items-center gap-2 shadow-lg shadow-green-500/20"
                     >
                         <Plus size={18} />
                         Add Staff
@@ -312,8 +401,8 @@ const Staff = () => {
                             <p className="text-gray-600 text-sm mb-1">Total Staff</p>
                             <h3 className="text-3xl font-bold text-gray-900">{stats.total}</h3>
                         </div>
-                        <div className="p-3 bg-teal-50 rounded-lg">
-                            <Users className="text-teal-500" size={24} />
+                        <div className="p-3 bg-green-50 rounded-lg">
+                            <Users className="text-green-500" size={24} />
                         </div>
                     </div>
                 </div>
@@ -380,13 +469,13 @@ const Staff = () => {
                             placeholder="Search by name, CNIC, phone, or email..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                         />
                     </div>
                     <select
                         value={roleFilter}
                         onChange={(e) => setRoleFilter(e.target.value)}
-                        className="px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                        className="px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                     >
                         <option>All Roles</option>
                         {ROLES.map(role => <option key={role}>{role}</option>)}
@@ -394,7 +483,7 @@ const Staff = () => {
                     <select
                         value={shiftFilter}
                         onChange={(e) => setShiftFilter(e.target.value)}
-                        className="px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                        className="px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                     >
                         <option>All Shifts</option>
                         <option>Morning</option>
@@ -405,7 +494,7 @@ const Staff = () => {
                     <select
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
-                        className="px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                        className="px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                     >
                         <option>All Status</option>
                         <option>Active</option>
@@ -420,13 +509,13 @@ const Staff = () => {
                     <div key={member._id} className="bg-white rounded-xl p-6 border border-gray-200 hover:shadow-lg transition-shadow relative">
                         <div className="flex items-start justify-between mb-4">
                             <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 rounded-full bg-teal-100 text-teal-600 flex items-center justify-center font-bold text-lg">
+                                <div className="w-12 h-12 rounded-full bg-green-100 text-green-600 flex items-center justify-center font-bold text-lg">
                                     {getInitials(member.name)}
                                 </div>
                                 <div>
                                     <div className="flex items-center gap-2">
                                         <h3 className="font-semibold text-gray-900">{member.name}</h3>
-                                        <Check className="w-4 h-4 text-teal-500" />
+                                        <Check className="w-4 h-4 text-green-500" />
                                     </div>
                                     <div className="flex gap-2 mt-1">
                                         <span className={`px-2 py-0.5 rounded text-xs font-medium border ${getRoleBadgeColor(member.role)}`}>
@@ -531,7 +620,7 @@ const Staff = () => {
                         <div className="flex justify-between items-center pt-4 border-t border-gray-100">
                             <div>
                                 <p className="text-xs text-gray-500">Salary</p>
-                                <p className="text-sm font-semibold text-teal-600">Rs {member.baseSalary?.toLocaleString()}</p>
+                                <p className="text-sm font-semibold text-green-600">Rs {member.baseSalary?.toLocaleString()}</p>
                             </div>
                             <div className="text-right">
                                 <p className="text-xs text-gray-500">Joined</p>
@@ -583,7 +672,7 @@ const Staff = () => {
                                                 value={formData.name}
                                                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                                 placeholder="Enter full name"
-                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                                             />
                                         </div>
                                         <div>
@@ -595,7 +684,7 @@ const Staff = () => {
                                                 value={formData.fatherName}
                                                 onChange={(e) => setFormData({ ...formData, fatherName: e.target.value })}
                                                 placeholder="Father's name"
-                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                                             />
                                         </div>
                                         <div>
@@ -607,7 +696,7 @@ const Staff = () => {
                                                 value={formData.cnic}
                                                 onChange={(e) => setFormData({ ...formData, cnic: e.target.value })}
                                                 placeholder="35201-1234567-1"
-                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                                             />
                                         </div>
                                         <div>
@@ -619,7 +708,7 @@ const Staff = () => {
                                                 value={formData.phone}
                                                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                                                 placeholder="0321-1234567"
-                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                                             />
                                         </div>
                                         <div className="col-span-2">
@@ -631,7 +720,7 @@ const Staff = () => {
                                                 value={formData.email}
                                                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                                                 placeholder="staff@pharmacy.pk"
-                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                                             />
                                         </div>
                                         <div>
@@ -643,7 +732,7 @@ const Staff = () => {
                                                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                                                 placeholder="Full address"
                                                 rows="3"
-                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                                             />
                                         </div>
                                         <div>
@@ -653,7 +742,7 @@ const Staff = () => {
                                             <select
                                                 value={formData.city}
                                                 onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                                             >
                                                 {CITIES.map(city => (
                                                     <option key={city} value={city}>{city}</option>
@@ -674,7 +763,7 @@ const Staff = () => {
                                             <select
                                                 value={formData.role}
                                                 onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                                             >
                                                 {ROLES.map(role => (
                                                     <option key={role} value={role}>{role}</option>
@@ -688,7 +777,7 @@ const Staff = () => {
                                             <select
                                                 value={formData.employmentType}
                                                 onChange={(e) => setFormData({ ...formData, employmentType: e.target.value })}
-                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                                             >
                                                 {EMPLOYMENT_TYPES.map(type => (
                                                     <option key={type} value={type}>{type}</option>
@@ -702,7 +791,7 @@ const Staff = () => {
                                             <select
                                                 value={formData.shift}
                                                 onChange={(e) => setFormData({ ...formData, shift: e.target.value })}
-                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                                             >
                                                 {SHIFTS.map(shift => (
                                                     <option key={shift} value={shift}>{shift}</option>
@@ -718,7 +807,7 @@ const Staff = () => {
                                                 value={formData.baseSalary}
                                                 onChange={(e) => setFormData({ ...formData, baseSalary: e.target.value })}
                                                 placeholder="25000"
-                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                                             />
                                         </div>
                                         <div className="col-span-2">
@@ -729,7 +818,7 @@ const Staff = () => {
                                                 type="date"
                                                 value={formData.joiningDate}
                                                 onChange={(e) => setFormData({ ...formData, joiningDate: e.target.value })}
-                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                                             />
                                         </div>
                                     </div>
@@ -748,7 +837,7 @@ const Staff = () => {
                                                 value={formData.emergencyContactName}
                                                 onChange={(e) => setFormData({ ...formData, emergencyContactName: e.target.value })}
                                                 placeholder="Emergency contact name"
-                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                                             />
                                         </div>
                                         <div>
@@ -760,7 +849,7 @@ const Staff = () => {
                                                 value={formData.emergencyContactPhone}
                                                 onChange={(e) => setFormData({ ...formData, emergencyContactPhone: e.target.value })}
                                                 placeholder="0300-1234567"
-                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500"
                                             />
                                         </div>
                                     </div>
@@ -774,7 +863,7 @@ const Staff = () => {
                                     </div>
                                     <button
                                         onClick={() => setFormData({ ...formData, status: formData.status === 'Active' ? 'Deactivated' : 'Active' })}
-                                        className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${formData.status === 'Active' ? 'bg-teal-500' : 'bg-gray-300'
+                                        className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${formData.status === 'Active' ? 'bg-green-500' : 'bg-gray-300'
                                             }`}
                                     >
                                         <span
@@ -794,7 +883,7 @@ const Staff = () => {
                                 </button>
                                 <button
                                     onClick={handleAddStaff}
-                                    className="px-6 py-2.5 bg-teal-500 text-white rounded-lg font-medium hover:bg-teal-600"
+                                    className="px-6 py-2.5 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600"
                                 >
                                     Add Staff
                                 </button>
@@ -855,7 +944,7 @@ const Staff = () => {
                                             type="date"
                                             value={salaryData.periodStart}
                                             onChange={(e) => setSalaryData({ ...salaryData, periodStart: e.target.value })}
-                                            className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
+                                            className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none"
                                         />
                                     </div>
                                     <div>
@@ -864,7 +953,7 @@ const Staff = () => {
                                             type="date"
                                             value={salaryData.periodEnd}
                                             onChange={(e) => setSalaryData({ ...salaryData, periodEnd: e.target.value })}
-                                            className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
+                                            className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none"
                                         />
                                     </div>
                                 </div>
@@ -883,7 +972,7 @@ const Staff = () => {
                                     <select
                                         value={salaryData.paymentMethod}
                                         onChange={(e) => setSalaryData({ ...salaryData, paymentMethod: e.target.value })}
-                                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
+                                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none"
                                     >
                                         <option value="Cash">Cash</option>
                                         <option value="Bank">Bank Transfer</option>
@@ -901,7 +990,7 @@ const Staff = () => {
                                 </button>
                                 <button
                                     onClick={handlePaySalary}
-                                    className="px-6 py-2 bg-teal-500 text-white rounded-lg font-medium hover:bg-teal-600"
+                                    className="px-6 py-2 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600"
                                 >
                                     Confirm Payment
                                 </button>
@@ -930,7 +1019,7 @@ const Staff = () => {
                                         value={advanceData.amount}
                                         onChange={(e) => setAdvanceData({ ...advanceData, amount: e.target.value })}
                                         placeholder="Enter amount"
-                                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
+                                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none"
                                     />
                                 </div>
                                 <div>
@@ -939,7 +1028,7 @@ const Staff = () => {
                                         type="date"
                                         value={advanceData.date}
                                         onChange={(e) => setAdvanceData({ ...advanceData, date: e.target.value })}
-                                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
+                                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none"
                                     />
                                 </div>
                                 <div>
@@ -949,7 +1038,7 @@ const Staff = () => {
                                         onChange={(e) => setAdvanceData({ ...advanceData, note: e.target.value })}
                                         placeholder="e.g. Medical emergency, Loan"
                                         rows="3"
-                                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none resize-none"
+                                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none resize-none"
                                     />
                                 </div>
                             </div>
