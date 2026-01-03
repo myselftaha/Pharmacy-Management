@@ -3,6 +3,9 @@ import { X, Plus } from 'lucide-react';
 import API_URL from '../../config/api';
 import { useToast } from '../../context/ToastContext';
 import RecordPaymentModal from './RecordPaymentModal';
+import ReceiveStockModal from './ReceiveStockModal';
+import PurchaseOrderModal from './PurchaseOrderModal';
+import { ShoppingCart, CheckCircle, XCircle, Trash2 } from 'lucide-react';
 
 const DistributorLedgerModal = ({ isOpen, onClose, supplier, onUpdate }) => {
     const { showToast } = useToast();
@@ -11,6 +14,9 @@ const DistributorLedgerModal = ({ isOpen, onClose, supplier, onUpdate }) => {
     const [loading, setLoading] = useState(true);
     const [purchaseOrders, setPurchaseOrders] = useState([]);
     const [isRecordPaymentOpen, setIsRecordPaymentOpen] = useState(false);
+    const [isReceiveStockOpen, setIsReceiveStockOpen] = useState(false);
+    const [isPurchaseOrderOpen, setIsPurchaseOrderOpen] = useState(false);
+    const [selectedOrder, setSelectedOrder] = useState(null);
 
     const handlePaymentSuccess = () => {
         fetchLedger();
@@ -47,6 +53,28 @@ const DistributorLedgerModal = ({ isOpen, onClose, supplier, onUpdate }) => {
         } catch (error) {
             console.error('Error fetching purchase orders:', error);
         }
+    };
+
+    const handleCancelOrder = async (orderId) => {
+        if (!window.confirm('Are you sure you want to cancel this order?')) return;
+        try {
+            const response = await fetch(`${API_URL}/api/purchase-orders/${orderId}/cancel`, {
+                method: 'POST'
+            });
+            if (response.ok) {
+                showToast('Order cancelled successfully', 'success');
+                fetchPurchaseOrders();
+            } else {
+                showToast('Failed to cancel order', 'error');
+            }
+        } catch (error) {
+            showToast('Network error', 'error');
+        }
+    };
+
+    const handleReceiveOrder = (order) => {
+        setSelectedOrder(order);
+        setIsReceiveStockOpen(true);
     };
 
     if (!isOpen) return null;
@@ -118,13 +146,22 @@ const DistributorLedgerModal = ({ isOpen, onClose, supplier, onUpdate }) => {
                             </button>
                         </div>
 
-                        <button
-                            onClick={() => setIsRecordPaymentOpen(true)}
-                            className="flex items-center gap-2 bg-[#00c950] hover:bg-[#00b347] text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-all shadow-sm"
-                        >
-                            <Plus size={18} />
-                            Record Payment
-                        </button>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setIsPurchaseOrderOpen(true)}
+                                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-all shadow-sm"
+                            >
+                                <ShoppingCart size={18} />
+                                New Order
+                            </button>
+                            <button
+                                onClick={() => setIsRecordPaymentOpen(true)}
+                                className="flex items-center gap-2 bg-[#00c950] hover:bg-[#00b347] text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-all shadow-sm"
+                            >
+                                <Plus size={18} />
+                                Record Payment
+                            </button>
+                        </div>
                     </div>
 
                     {/* Content Section */}
@@ -199,6 +236,7 @@ const DistributorLedgerModal = ({ isOpen, onClose, supplier, onUpdate }) => {
                                                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Items</th>
                                                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
                                                 <th className="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Total</th>
+                                                <th className="px-6 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-100">
@@ -215,18 +253,43 @@ const DistributorLedgerModal = ({ isOpen, onClose, supplier, onUpdate }) => {
                                                             {order.items?.length || 0} items
                                                         </td>
                                                         <td className="px-6 py-4">
-                                                            <span className="inline-flex px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-700">
-                                                                {order.status || 'Completed'}
+                                                            <span className={`inline-flex px-2 py-1 rounded text-xs font-medium ${order.status === 'Received' ? 'bg-green-100 text-green-700' :
+                                                                order.status === 'Cancelled' ? 'bg-red-100 text-red-700' :
+                                                                    'bg-amber-100 text-amber-700'
+                                                                }`}>
+                                                                {order.status || 'Pending'}
                                                             </span>
                                                         </td>
                                                         <td className="px-6 py-4 text-sm text-right font-semibold text-gray-900">
                                                             Rs {order.total?.toLocaleString() || 0}
                                                         </td>
+                                                        <td className="px-6 py-4">
+                                                            <div className="flex items-center justify-center gap-2">
+                                                                {order.status === 'Pending' && (
+                                                                    <>
+                                                                        <button
+                                                                            onClick={() => handleReceiveOrder(order)}
+                                                                            className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                                                            title="Receive Stock"
+                                                                        >
+                                                                            <CheckCircle size={18} />
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => handleCancelOrder(order._id)}
+                                                                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                                            title="Cancel Order"
+                                                                        >
+                                                                            <XCircle size={18} />
+                                                                        </button>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        </td>
                                                     </tr>
                                                 ))
                                             ) : (
                                                 <tr>
-                                                    <td colSpan="5" className="px-6 py-12 text-center text-gray-400">
+                                                    <td colSpan="6" className="px-6 py-12 text-center text-gray-400">
                                                         <p className="text-sm font-medium">No purchase orders found</p>
                                                     </td>
                                                 </tr>
@@ -245,6 +308,23 @@ const DistributorLedgerModal = ({ isOpen, onClose, supplier, onUpdate }) => {
                 onClose={() => setIsRecordPaymentOpen(false)}
                 supplier={supplier}
                 onSuccess={handlePaymentSuccess}
+            />
+
+            <PurchaseOrderModal
+                isOpen={isPurchaseOrderOpen}
+                onClose={() => setIsPurchaseOrderOpen(false)}
+                supplier={supplier}
+                onSuccess={fetchPurchaseOrders}
+            />
+
+            <ReceiveStockModal
+                isOpen={isReceiveStockOpen}
+                onClose={() => setIsReceiveStockOpen(false)}
+                order={selectedOrder}
+                onSuccess={() => {
+                    fetchPurchaseOrders();
+                    fetchLedger();
+                }}
             />
         </div>
     );

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2 } from 'lucide-react';
+import { X, Plus, Trash2, AlertCircle } from 'lucide-react';
 import API_URL from '../../config/api';
 import { useToast } from '../../context/ToastContext';
 
@@ -228,18 +228,14 @@ const PurchaseOrderModal = ({ isOpen, onClose, supplier, onSuccess }) => {
 
                     {/* Order Details */}
                     <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1.5">Order Status</label>
-                            <select
-                                value={orderStatus}
-                                onChange={(e) => setOrderStatus(e.target.value)}
-                                className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2.5 text-sm text-gray-700 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
-                            >
-                                <option value="Pending">Pending</option>
-                                <option value="Confirmed">Confirmed</option>
-                                <option value="Delivered">Delivered</option>
-                                <option value="Cancelled">Cancelled</option>
-                            </select>
+                        <div className="bg-amber-50 p-4 rounded-lg border border-amber-100 flex items-start gap-3">
+                            <div className="p-1 bg-amber-100 rounded text-amber-600">
+                                <AlertCircle size={16} />
+                            </div>
+                            <div>
+                                <h4 className="text-sm font-semibold text-amber-900">Pending Order</h4>
+                                <p className="text-xs text-amber-700 mt-0.5">This order will be created as <strong>Pending</strong>. Stock will be updated only after you verify and "Receive" it from the ledger.</p>
+                            </div>
                         </div>
 
                         <div>

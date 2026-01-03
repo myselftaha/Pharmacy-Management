@@ -827,7 +827,7 @@ const purchaseOrderSchema = new mongoose.Schema({
         netItemTotal: Number,
         costPerUnit: Number // Effective cost after bonus and discount
     }],
-    status: { type: String, enum: ['Pending', 'Confirmed', 'Received', 'Cancelled'], default: 'Received' },
+    status: { type: String, enum: ['Pending', 'Confirmed', 'Received', 'Cancelled'], default: 'Pending' },
     expectedDelivery: Date,
     notes: String,
     subtotal: Number,
@@ -2911,90 +2911,22 @@ app.put('/api/payments/:id/clear-cheque', async (req, res) => {
     }
 });
 
-// Create new Purchase Order
+// Create new Purchase Order (Step 1: Save as Pending)
 app.post('/api/purchase-orders', async (req, res) => {
     try {
         const {
             distributorId, distributorInvoiceNumber, invoiceDate, items,
-            notes, expectedDelivery, subtotal, gstAmount, whtAmount, total, status
+            notes, expectedDelivery, subtotal, gstAmount, whtAmount, total
         } = req.body;
 
         const supplier = await Supplier.findById(distributorId);
         if (!supplier) return res.status(404).json({ message: 'Supplier not found' });
 
-        const processedItems = [];
-        for (const item of items) {
-            // Find medicine
-            let medicine = await Medicine.findById(item.medicineId);
-            if (!medicine) {
-                // Try finding by custom numeric ID
-                if (typeof item.medicineId === 'number' || (typeof item.medicineId === 'string' && item.medicineId.match(/^\d+$/))) {
-                    medicine = await Medicine.findOne({ id: parseInt(item.medicineId) });
-                }
-            }
-
-            if (medicine) {
-                const billedQty = Number(item.billedQuantity) || 0;
-                const bonusQty = Number(item.bonusQuantity) || 0;
-                const totalUnits = billedQty + bonusQty;
-
-                // Update Medicine Overall Stock
-                medicine.stock = (medicine.stock || 0) + totalUnits;
-                medicine.inInventory = true;
-
-                // Update cost price in medicine master (use cost per unit)
-                if (item.costPerUnit) {
-                    medicine.costPrice = item.costPerUnit;
-                }
-
-                await medicine.save();
-
-                // Create/Update Batch for this medicine
-                // We create a new batch for every purchase by default unless batch number exists for this medicine
-                // Market standard: New batch = New entry
-                const newBatch = new Batch({
-                    batchNumber: item.batchNumber,
-                    medicineId: medicine._id,
-                    medicineName: medicine.name,
-                    quantity: totalUnits,
-                    purchasedQuantity: totalUnits,
-                    expiryDate: new Date(item.expiryDate),
-                    purchaseDate: invoiceDate || new Date(),
-                    supplierId: supplier._id,
-                    supplierName: supplier.name,
-                    costPrice: item.costPerUnit || item.unitPrice,
-                    sellingPrice: medicine.price || item.unitPrice * 1.2, // Default markup if not set
-                    status: 'Active'
-                });
-                await newBatch.save();
-
-                processedItems.push({
-                    ...item,
-                    costPerUnit: item.costPerUnit || (item.netItemTotal / totalUnits)
-                });
-
-                // Create Supply Record (Ledger Entry)
-                const newSupply = new Supply({
-                    medicineId: medicine._id.toString(),
-                    name: medicine.name,
-                    batchNumber: item.batchNumber,
-                    supplierName: supplier.name,
-                    purchaseCost: item.costPerUnit || (item.netItemTotal / totalUnits), // Effective cost
-                    purchaseInvoiceNumber: distributorInvoiceNumber,
-                    expiryDate: new Date(item.expiryDate),
-                    quantity: totalUnits,
-                    freeQuantity: bonusQty,
-
-                    itemAmount: item.netItemTotal,
-                    payableAmount: item.netItemTotal,
-
-                    paymentStatus: 'Unpaid',
-                    paidAmount: 0,
-                    addedDate: invoiceDate || new Date()
-                });
-                await newSupply.save();
-            }
-        }
+        // Just validate items and calculate costPerUnit, no stock updates yet
+        const processedItems = items.map(item => ({
+            ...item,
+            costPerUnit: item.costPerUnit || (item.netItemTotal / (Number(item.billedQuantity) + Number(item.bonusQuantity || 0)) || item.unitPrice)
+        }));
 
         const newOrder = new PurchaseOrder({
             distributorId,
@@ -3002,7 +2934,7 @@ app.post('/api/purchase-orders', async (req, res) => {
             distributorInvoiceNumber,
             invoiceDate: invoiceDate || new Date(),
             items: processedItems,
-            status: status || 'Received',
+            status: 'Pending', // Step 1 is always Pending
             notes,
             expectedDelivery,
             subtotal,
@@ -3013,15 +2945,133 @@ app.post('/api/purchase-orders', async (req, res) => {
 
         const savedOrder = await newOrder.save();
 
-        // Update Supplier Balance and Status
-        supplier.totalPayable = (supplier.totalPayable || 0) + total;
+        // Update Supplier Basic Info
         supplier.lastOrderDate = new Date();
         supplier.status = 'Active';
         await supplier.save();
 
         res.status(201).json(savedOrder);
     } catch (err) {
-        console.error('PO Creation Error:', err);
+        console.error('Error creating PO:', err);
+        res.status(400).json({ message: err.message });
+    }
+});
+
+// Receive Stock (Step 2: Atomic Transaction)
+app.post('/api/purchase-orders/:id/receive', async (req, res) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+        const { id } = req.params;
+        const { items, invoiceDate } = req.body; // Items contain received quantity, batch, and expiry
+
+        const order = await PurchaseOrder.findById(id).session(session);
+        if (!order) throw new Error('Order not found');
+        if (order.status !== 'Pending') throw new Error(`Cannot receive stock for ${order.status} order`);
+
+        const supplier = await Supplier.findById(order.distributorId).session(session);
+        if (!supplier) throw new Error('Supplier not found');
+
+        let finalTotalPayable = 0;
+
+        for (const item of items) {
+            let medicine = await Medicine.findById(item.medicineId).session(session);
+            if (!medicine && (typeof item.medicineId === 'number' || String(item.medicineId).match(/^\d+$/))) {
+                medicine = await Medicine.findOne({ id: parseInt(item.medicineId) }).session(session);
+            }
+            if (!medicine) continue;
+
+            const receivedQty = Number(item.receivedQuantity) || 0;
+            const bonusQty = Number(item.bonusQuantity) || 0;
+            const totalUnits = receivedQty + bonusQty;
+
+            // 1. Update Medicine Master Stock
+            medicine.stock = (medicine.stock || 0) + totalUnits;
+            medicine.inInventory = true;
+            if (item.costPerUnit) medicine.costPrice = item.costPerUnit;
+            await medicine.save({ session });
+
+            // 2. Create Batch Entry
+            const newBatch = new Batch({
+                batchNumber: item.batchNumber,
+                medicineId: medicine._id,
+                medicineName: medicine.name,
+                quantity: totalUnits,
+                purchasedQuantity: totalUnits,
+                expiryDate: new Date(item.expiryDate),
+                purchaseDate: invoiceDate || order.invoiceDate || new Date(),
+                supplierId: supplier._id,
+                supplierName: supplier.name,
+                costPrice: item.costPerUnit || item.unitPrice,
+                sellingPrice: medicine.price || (item.unitPrice * 1.2),
+                status: 'Active'
+            });
+            await newBatch.save({ session });
+
+            // 3. Create Supply Record (Ledger)
+            const itemTotal = Number(item.netItemTotal) || (receivedQty * (item.unitPrice || 0));
+            finalTotalPayable += itemTotal;
+
+            const newSupply = new Supply({
+                medicineId: medicine._id.toString(),
+                name: medicine.name,
+                batchNumber: item.batchNumber,
+                supplierName: supplier.name,
+                purchaseCost: item.costPerUnit || (itemTotal / totalUnits),
+                purchaseInvoiceNumber: order.distributorInvoiceNumber,
+                expiryDate: new Date(item.expiryDate),
+                quantity: totalUnits,
+                freeQuantity: bonusQty,
+                itemAmount: itemTotal,
+                payableAmount: itemTotal,
+                paymentStatus: 'Unpaid',
+                paidAmount: 0,
+                addedDate: invoiceDate || new Date()
+            });
+            await newSupply.save({ session });
+
+            // Update item in order record for history
+            const poItemIndex = order.items.findIndex(i => i.medicineId.toString() === item.medicineId.toString());
+            if (poItemIndex > -1) {
+                order.items[poItemIndex].receivedQuantity = receivedQty;
+                order.items[poItemIndex].batchNumber = item.batchNumber;
+                order.items[poItemIndex].expiryDate = new Date(item.expiryDate);
+                order.items[poItemIndex].netItemTotal = itemTotal;
+            }
+        }
+
+        // 4. Update Order Status
+        order.status = 'Received';
+        order.receivedAt = new Date();
+        if (finalTotalPayable > 0) order.total = finalTotalPayable;
+        await order.save({ session });
+
+        // 5. Update Supplier Balance
+        supplier.totalPayable = (supplier.totalPayable || 0) + (finalTotalPayable || order.total);
+        await supplier.save({ session });
+
+        await session.commitTransaction();
+        res.json({ message: 'Stock received successfully', order });
+    } catch (err) {
+        await session.abortTransaction();
+        console.error('Stock Receive Transaction Error:', err);
+        res.status(400).json({ message: err.message });
+    } finally {
+        session.endSession();
+    }
+});
+
+// Cancel Purchase Order
+app.post('/api/purchase-orders/:id/cancel', async (req, res) => {
+    try {
+        const order = await PurchaseOrder.findById(req.params.id);
+        if (!order) return res.status(404).json({ message: 'Order not found' });
+        if (order.status !== 'Pending') return res.status(400).json({ message: 'Only Pending orders can be cancelled' });
+
+        order.status = 'Cancelled';
+        await order.save();
+        res.json({ message: 'Order cancelled successfully' });
+    } catch (err) {
         res.status(400).json({ message: err.message });
     }
 });
