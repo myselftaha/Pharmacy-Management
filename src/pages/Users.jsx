@@ -30,12 +30,19 @@ const Users = () => {
                     'Authorization': `Bearer ${token}`
                 }
             });
-            if (!response.ok) throw new Error('Failed to fetch');
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to fetch users');
+            }
             const data = await response.json();
             setUsers(data);
         } catch (err) {
-            showToast('Failed to load users list', 'error');
-            console.error(err);
+            showToast(err.message, 'error');
+            console.error('Fetch Users Error:', err);
+            if (err.message.includes('Invalid') || err.message.includes('expired')) {
+                // Optional: Redirect to login or prompt user
+                showToast('Session expired. Please login again.', 'warning');
+            }
         } finally {
             setLoading(false);
         }

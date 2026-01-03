@@ -106,10 +106,16 @@ const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
-    if (!token) return res.status(401).json({ message: 'Authentication required' });
+    if (!token) {
+        console.warn(`[AUTH] No token provided for ${req.url}`);
+        return res.status(401).json({ message: 'Authentication required' });
+    }
 
     jwt.verify(token, JWT_SECRET, (err, user) => {
-        if (err) return res.status(403).json({ message: 'Invalid or expired token' });
+        if (err) {
+            console.error(`[AUTH] Token verification failed for ${req.url}:`, err.message);
+            return res.status(403).json({ message: 'Invalid or expired token' });
+        }
         req.user = user;
         next();
     });
@@ -117,8 +123,13 @@ const authenticateToken = (req, res, next) => {
 
 const authorizeRoles = (...roles) => {
     return (req, res, next) => {
-        if (!req.user || !roles.includes(req.user.role)) {
-            return res.status(403).json({ message: 'Forbidden: Insufficient permissions' });
+        if (!req.user) {
+            console.warn(`[AUTH] User not attached to request for ${req.url}`);
+            return res.status(403).json({ message: 'Forbidden: No user data' });
+        }
+        if (!roles.includes(req.user.role)) {
+            console.warn(`[AUTH] Role mismatch for ${req.url}. User Role: '${req.user.role}', Required: ${JSON.stringify(roles)}`);
+            return res.status(403).json({ message: `Forbidden: Insufficient permissions (Role: ${req.user.role})` });
         }
         next();
     };
@@ -910,8 +921,11 @@ app.post('/api/users/login', async (req, res) => {
     try {
         const { username, password } = req.body;
         const user = await User.findOne({ username });
-        if (!user || user.status === 'Deactivated') {
-            return res.status(401).json({ message: 'Invalid credentials or account deactivated' });
+        if (!user) {
+            return res.status(401).json({ message: 'Invalid credentials' });
+        }
+        if (user.status === 'Deactivated') {
+            return res.status(403).json({ message: 'Your account has been deactivated. Please contact the administrator.' });
         }
         const isMatch = await bcrypt.compare(password, user.passwordHash);
         if (!isMatch) return res.status(401).json({ message: 'Invalid credentials' });
@@ -934,7 +948,7 @@ app.post('/api/users/login', async (req, res) => {
 });
 
 // List Users
-app.get('/api/users', authenticateToken, authorizeRoles('Admin', 'Super Admin'), async (req, res) => {
+app.get('/api/users', authenticateToken, authorizeRoles('Admin', 'Super Admin', 'Owner'), async (req, res) => {
     try {
         const users = await User.find({}, '-passwordHash').sort({ createdAt: -1 });
         res.json(users);
@@ -944,14 +958,14 @@ app.get('/api/users', authenticateToken, authorizeRoles('Admin', 'Super Admin'),
 });
 
 // Add User
-app.post('/api/users', authenticateToken, authorizeRoles('Admin', 'Super Admin'), async (req, res) => {
+app.post('/api/users', authenticateToken, authorizeRoles('Admin', 'Super Admin', 'Owner'), async (req, res) => {
     try {
         const { username, password, role, permissions } = req.body;
         const existing = await User.findOne({ username });
         if (existing) return res.status(400).json({ message: 'Username already taken' });
 
-        if (role === 'Super Admin' && req.user.role !== 'Super Admin') {
-            return res.status(403).json({ message: 'Only Super Admin can create other Super Admins' });
+        if ((role === 'Super Admin' || role === 'Owner') && (req.user.role !== 'Super Admin' && req.user.role !== 'Owner')) {
+            return res.status(403).json({ message: 'Only Super Admin/Owner can create other Super Admins/Owners' });
         }
 
         const passwordHash = await bcrypt.hash(password, 10);
@@ -964,21 +978,29 @@ app.post('/api/users', authenticateToken, authorizeRoles('Admin', 'Super Admin')
 });
 
 // Update User
-app.put('/api/users/:id', authenticateToken, authorizeRoles('Admin', 'Super Admin'), async (req, res) => {
+app.put('/api/users/:id', authenticateToken, authorizeRoles('Admin', 'Super Admin', 'Owner'), async (req, res) => {
     try {
         const { role, permissions, status } = req.body;
         const userToUpdate = await User.findById(req.params.id);
         if (!userToUpdate) return res.status(404).json({ message: 'User not found' });
 
-        // Security Rules: Admin cannot modify Super Admin
-        if (userToUpdate.role === 'Super Admin' && req.user.role !== 'Super Admin') {
-            return res.status(403).json({ message: 'Only Super Admin can modify other Super Admins' });
+        // Security Rules: Admin cannot modify Super Admin/Owner
+        const isTargetSuper = userToUpdate.role === 'Super Admin' || userToUpdate.role === 'Owner';
+        const isRequesterSuper = req.user.role === 'Super Admin' || req.user.role === 'Owner';
+
+        if (isTargetSuper && !isRequesterSuper) {
+            return res.status(403).json({ message: 'Only Super Admin/Owner can modify other Super Admins/Owners' });
         }
 
         if (role) {
-            // Only Super Admin can promote/demote or create other Super Admins
-            if (role === 'Super Admin' && req.user.role !== 'Super Admin') {
-                return res.status(403).json({ message: 'Only Super Admin can assign Super Admin role' });
+            // IMMUTABLE RULE: Super Admin role cannot be changed
+            if (userToUpdate.role === 'Super Admin') {
+                return res.status(403).json({ message: 'Super Admin role cannot be changed' });
+            }
+
+            // Only Super Admin/Owner can promote/demote or assign restricted roles
+            if ((role === 'Super Admin' || role === 'Owner') && !isRequesterSuper) {
+                return res.status(403).json({ message: 'Only Super Admin/Owner can assign restricted roles' });
             }
             userToUpdate.role = role;
         }
