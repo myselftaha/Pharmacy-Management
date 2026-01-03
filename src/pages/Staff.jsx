@@ -557,7 +557,7 @@ const Staff = () => {
             {/* Add Staff Modal */}
             {
                 showAddModal && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                         <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
                             <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex justify-between items-center">
                                 <div>
@@ -806,7 +806,7 @@ const Staff = () => {
             {/* Delete Confirmation Modal */}
             {
                 showDeleteModal && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
                         <div className="bg-white rounded-2xl w-full max-w-md p-6">
                             <div className="text-center">
                                 <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100 mb-4">
@@ -839,7 +839,7 @@ const Staff = () => {
             {/* Pay Salary Modal */}
             {
                 showSalaryModal && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
                         <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden">
                             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
                                 <h2 className="text-xl font-bold text-gray-900">Pay Salary - {selectedStaff?.name}</h2>
@@ -914,7 +914,7 @@ const Staff = () => {
             {/* Add Advance Modal */}
             {
                 showAdvanceModal && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
                         <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden">
                             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
                                 <h2 className="text-xl font-bold text-gray-900">Add Advance - {selectedStaff?.name}</h2>
@@ -974,7 +974,7 @@ const Staff = () => {
 
             {/* Salary History Modal */}
             {showHistoryModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70] p-4">
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
                     <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
                         <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
                             <div>
