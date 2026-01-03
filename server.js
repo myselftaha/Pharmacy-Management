@@ -345,9 +345,12 @@ const cashDrawerSchema = new mongoose.Schema({
     expectedCash: { type: Number, default: 0 },
     actualCash: { type: Number },
     difference: { type: Number },
-    status: { type: String, enum: ['Open', 'Closed'], default: 'Open' },
+    status: { type: String, enum: ['Open', 'Closed', 'Reopened'], default: 'Open' },
     openedAt: { type: Date, default: Date.now },
     closedAt: Date,
+    reopenedAt: Date,
+    reopenedBy: String,
+    reopenReason: String,
     notes: String,
     processedBy: String,
     createdAt: { type: Date, default: Date.now }
@@ -357,6 +360,30 @@ const cashDrawerSchema = new mongoose.Schema({
 cashDrawerSchema.index({ date: 1 }, { unique: true });
 
 const CashDrawer = mongoose.model('CashDrawer', cashDrawerSchema);
+
+// Cash Drawer Audit Log Schema - Track all drawer operations
+const cashDrawerLogSchema = new mongoose.Schema({
+    drawerId: { type: mongoose.Schema.Types.ObjectId, ref: 'CashDrawer', required: true },
+    date: { type: String, required: true },
+    actionType: {
+        type: String,
+        required: true,
+        enum: ['OPEN', 'CLOSE', 'REOPEN', 'ADD_EXPENSE', 'EDIT']
+    },
+    performedBy: { type: String, required: true },
+    userRole: { type: String, required: true },
+    reason: String,
+    oldData: mongoose.Schema.Types.Mixed,
+    newData: mongoose.Schema.Types.Mixed,
+    timestamp: { type: Date, default: Date.now }
+});
+
+// Indexes for efficient queries
+cashDrawerLogSchema.index({ drawerId: 1 });
+cashDrawerLogSchema.index({ date: 1 });
+cashDrawerLogSchema.index({ timestamp: -1 });
+
+const CashDrawerLog = mongoose.model('CashDrawerLog', cashDrawerLogSchema);
 
 // --- CASH DRAWER ROUTES ---
 
@@ -368,8 +395,8 @@ app.get('/api/cash-drawer/status', async (req, res) => {
 
         let drawer = await CashDrawer.findOne({ date });
 
-        // If drawer exists and is open, we need to auto-calculate the latest sales and expenses
-        if (drawer && drawer.status === 'Open') {
+        // If drawer exists and is open or reopened, we need to auto-calculate the latest sales and expenses
+        if (drawer && (drawer.status === 'Open' || drawer.status === 'Reopened')) {
             const startOfDay = new Date(date);
             startOfDay.setHours(0, 0, 0, 0);
             const endOfDay = new Date(date);
@@ -444,6 +471,20 @@ app.post('/api/cash-drawer/open', async (req, res) => {
         });
 
         await newDrawer.save();
+
+        // Create audit log entry
+        await CashDrawerLog.create({
+            drawerId: newDrawer._id,
+            date,
+            actionType: 'OPEN',
+            performedBy: processedBy || 'Admin',
+            userRole: 'Admin', // Will be enhanced with actual role from auth token
+            newData: {
+                openingBalance: newDrawer.openingBalance,
+                status: 'Open'
+            }
+        });
+
         res.status(201).json(newDrawer);
     } catch (err) {
         res.status(400).json({ message: err.message });
@@ -458,6 +499,13 @@ app.post('/api/cash-drawer/close', async (req, res) => {
         const drawer = await CashDrawer.findOne({ date });
         if (!drawer) return res.status(404).json({ message: 'Drawer not found for this date' });
         if (drawer.status === 'Closed') return res.status(400).json({ message: 'Drawer is already closed' });
+
+        // Store old state for audit log
+        const oldState = {
+            status: drawer.status,
+            actualCash: drawer.actualCash,
+            difference: drawer.difference
+        };
 
         // Final calculation
         const startOfDay = new Date(date);
@@ -491,9 +539,108 @@ app.post('/api/cash-drawer/close', async (req, res) => {
         drawer.notes = notes;
 
         await drawer.save();
+
+        // Create audit log entry
+        await CashDrawerLog.create({
+            drawerId: drawer._id,
+            date,
+            actionType: 'CLOSE',
+            performedBy: drawer.processedBy || 'Admin',
+            userRole: 'Admin',
+            oldData: oldState,
+            newData: {
+                status: 'Closed',
+                actualCash: drawer.actualCash,
+                expectedCash: drawer.expectedCash,
+                difference: drawer.difference
+            }
+        });
+
         res.json(drawer);
     } catch (err) {
         res.status(400).json({ message: err.message });
+    }
+});
+
+// Re-Open Drawer (Admin/Owner Only)
+app.post('/api/cash-drawer/reopen', authenticateToken, async (req, res) => {
+    try {
+        const { date, reason } = req.body;
+
+        // Check user role - only Admin/Owner can reopen
+        if (!['Admin', 'Super Admin', 'Owner'].includes(req.user.role)) {
+            return res.status(403).json({ message: 'Only Admin or Owner can re-open a closed drawer' });
+        }
+
+        if (!reason || reason.trim().length === 0) {
+            return res.status(400).json({ message: 'Reason is required to re-open the drawer' });
+        }
+
+        const drawer = await CashDrawer.findOne({ date });
+        if (!drawer) {
+            return res.status(404).json({ message: 'Drawer not found for this date' });
+        }
+
+        if (drawer.status !== 'Closed') {
+            return res.status(400).json({ message: 'Only closed drawers can be re-opened' });
+        }
+
+        // Store old state for audit
+        const oldState = {
+            status: drawer.status,
+            closedAt: drawer.closedAt
+        };
+
+        // Update drawer to Reopened status
+        drawer.status = 'Reopened';
+        drawer.reopenedAt = new Date();
+        drawer.reopenedBy = req.user.username;
+        drawer.reopenReason = reason;
+
+        await drawer.save();
+
+        // Create audit log entry
+        await CashDrawerLog.create({
+            drawerId: drawer._id,
+            date,
+            actionType: 'REOPEN',
+            performedBy: req.user.username,
+            userRole: req.user.role,
+            reason: reason,
+            oldData: oldState,
+            newData: {
+                status: 'Reopened',
+                reopenedAt: drawer.reopenedAt,
+                reopenedBy: drawer.reopenedBy,
+                reopenReason: drawer.reopenReason
+            }
+        });
+
+        res.json({
+            message: 'Drawer re-opened successfully',
+            drawer
+        });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// Get Audit Logs
+app.get('/api/cash-drawer/logs', async (req, res) => {
+    try {
+        const { date, drawerId } = req.query;
+
+        let query = {};
+        if (date) query.date = date;
+        if (drawerId) query.drawerId = drawerId;
+
+        const logs = await CashDrawerLog.find(query)
+            .sort({ timestamp: -1 })
+            .limit(100);
+
+        res.json(logs);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
     }
 });
 
@@ -506,6 +653,65 @@ app.get('/api/cash-drawer/history', async (req, res) => {
         res.status(500).json({ message: err.message });
     }
 });
+
+// --- EXPENSE ROUTES ---
+
+// Add Expense (with drawer status check)
+app.post('/api/expenses', async (req, res) => {
+    try {
+        const { amount, category, description, date, paymentMethod, recordedBy } = req.body;
+
+        // If payment method is Cash, check if drawer is open or reopened
+        if (paymentMethod === 'Cash') {
+            const dateStr = new Date(date).toISOString().split('T')[0];
+            const drawer = await CashDrawer.findOne({ date: dateStr });
+
+            if (drawer && drawer.status === 'Closed') {
+                return res.status(400).json({
+                    message: 'Cannot add expenses - drawer is closed. Ask admin to re-open.'
+                });
+            }
+        }
+
+        const expense = new Expense({
+            amount: Math.round(parseFloat(amount)),
+            category,
+            description,
+            date,
+            paymentMethod,
+            recordedBy
+        });
+
+        await expense.save();
+
+        // If cash expense, create audit log
+        if (paymentMethod === 'Cash') {
+            const dateStr = new Date(date).toISOString().split('T')[0];
+            const drawer = await CashDrawer.findOne({ date: dateStr });
+
+            if (drawer) {
+                await CashDrawerLog.create({
+                    drawerId: drawer._id,
+                    date: dateStr,
+                    actionType: 'ADD_EXPENSE',
+                    performedBy: recordedBy || 'Staff',
+                    userRole: 'Staff',
+                    newData: {
+                        category,
+                        amount: expense.amount,
+                        description
+                    }
+                });
+            }
+        }
+
+        res.status(201).json(expense);
+    } catch (err) {
+        res.status(400).json({ message: err.message });
+    }
+});
+
+// --- OTHER SCHEMAS ---
 
 // Supply Schema (Purchase Record)
 const supplySchema = new mongoose.Schema({
@@ -921,11 +1127,8 @@ app.post('/api/users/login', async (req, res) => {
     try {
         const { username, password } = req.body;
         const user = await User.findOne({ username });
-        if (!user) {
-            return res.status(401).json({ message: 'Invalid credentials' });
-        }
-        if (user.status === 'Deactivated') {
-            return res.status(403).json({ message: 'Your account has been deactivated. Please contact the administrator.' });
+        if (!user || user.status === 'Deactivated') {
+            return res.status(401).json({ message: 'Invalid credentials or account deactivated' });
         }
         const isMatch = await bcrypt.compare(password, user.passwordHash);
         if (!isMatch) return res.status(401).json({ message: 'Invalid credentials' });
