@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import {
     Wallet,
     ArrowUpCircle,
@@ -15,7 +17,8 @@ import {
     DollarSign,
     RotateCcw,
     X,
-    AlertTriangle
+    AlertTriangle,
+    FileText
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import API_URL from '../config/api';
@@ -210,6 +213,45 @@ const CashDrawer = () => {
         } catch (error) {
             showToast('Connection error', 'error');
         }
+    };
+
+    const handleDownloadPDF = () => {
+        const doc = new jsPDF();
+
+        // Add Title
+        doc.setFontSize(18);
+        doc.text('Cash Drawer History Report', 14, 22);
+        doc.setFontSize(10);
+        doc.setTextColor(100);
+        doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 30);
+
+        const tableColumn = ["Date", "Status", "Audit", "Opening", "Sales", "Expenses", "Expected", "Actual", "Diff"];
+        const tableRows = history.map(h => [
+            h.date,
+            h.status.toUpperCase(),
+            h.reopenedAt ? "RE-OPENED" : "-",
+            Math.round(h.openingBalance).toLocaleString(),
+            Math.round(h.cashSales).toLocaleString(),
+            Math.round(h.cashExpenses).toLocaleString(),
+            Math.round(h.expectedCash).toLocaleString(),
+            h.actualCash ? Math.round(h.actualCash).toLocaleString() : '-',
+            h.difference ? (h.difference > 0 ? '+' : '') + Math.round(h.difference).toLocaleString() : '-'
+        ]);
+
+        autoTable(doc, {
+            head: [tableColumn],
+            body: tableRows,
+            startY: 35,
+            theme: 'striped',
+            headStyles: { fillColor: [0, 201, 80] },
+            styles: { fontSize: 8 },
+            columnStyles: {
+                2: { fontStyle: 'bold', textColor: [249, 115, 22] } // Audit column in orange
+            }
+        });
+
+        doc.save(`cash_drawer_history_${new Date().toISOString().split('T')[0]}.pdf`);
+        showToast('PDF Report downloaded', 'success');
     };
 
     const fetchAuditLogs = async () => {
@@ -627,33 +669,42 @@ const CashDrawer = () => {
                             <h3 className="font-bold text-gray-800 text-lg">Detailed History</h3>
                             <p className="text-xs text-gray-400">Past 30 days of records</p>
                         </div>
-                        <button
-                            onClick={() => {
-                                const headers = ['Date', 'Status', 'Opening', 'Sales', 'Expenses', 'Expected', 'Actual', 'Difference', 'Notes'];
-                                const csvContent = [
-                                    headers.join(','),
-                                    ...history.map(row => [
-                                        row.date,
-                                        row.status,
-                                        row.openingBalance,
-                                        row.cashSales,
-                                        row.cashExpenses,
-                                        row.expectedCash,
-                                        row.actualCash,
-                                        row.difference,
-                                        `"${row.notes || ''}"`
-                                    ].join(','))
-                                ].join('\n');
-                                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                                const link = document.createElement('a');
-                                link.href = URL.createObjectURL(blob);
-                                link.download = `cash_drawer_history_${new Date().toISOString().split('T')[0]}.csv`;
-                                link.click();
-                            }}
-                            className="px-4 py-2 bg-gray-800 text-white text-xs font-bold rounded-lg hover:bg-black transition-all flex items-center gap-2"
-                        >
-                            <Save size={14} /> Download CSV
-                        </button>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => {
+                                    const headers = ['Date', 'Status', 'Audit', 'Opening', 'Sales', 'Expenses', 'Expected', 'Actual', 'Difference', 'Notes'];
+                                    const csvContent = [
+                                        headers.join(','),
+                                        ...history.map(row => [
+                                            row.date,
+                                            row.status,
+                                            row.reopenedAt ? 'Was Reopened' : '-',
+                                            row.openingBalance,
+                                            row.cashSales,
+                                            row.cashExpenses,
+                                            row.expectedCash,
+                                            row.actualCash,
+                                            row.difference,
+                                            `"${row.notes || ''}"`
+                                        ].join(','))
+                                    ].join('\n');
+                                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                                    const link = document.createElement('a');
+                                    link.href = URL.createObjectURL(blob);
+                                    link.download = `cash_drawer_history_${new Date().toISOString().split('T')[0]}.csv`;
+                                    link.click();
+                                }}
+                                className="px-4 py-2 bg-gray-100 text-gray-700 text-xs font-bold rounded-lg hover:bg-gray-200 transition-all flex items-center gap-2"
+                            >
+                                <Save size={14} /> Download CSV
+                            </button>
+                            <button
+                                onClick={handleDownloadPDF}
+                                className="px-4 py-2 bg-gray-800 text-white text-xs font-bold rounded-lg hover:bg-black transition-all flex items-center gap-2"
+                            >
+                                <FileText size={14} /> Download PDF
+                            </button>
+                        </div>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left">
