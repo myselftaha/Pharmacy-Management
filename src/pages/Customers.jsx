@@ -253,7 +253,7 @@ const Customers = () => {
                                 <card.icon size={18} />
                             </div>
                         </div>
-                        <div className={`text-2xl font-black ${card.color}`}>
+                        <div className={`text-2xl font-bold ${card.color}`}>
                             {card.value}
                         </div>
                     </div>
@@ -309,89 +309,86 @@ const Customers = () => {
             </div>
 
             {/* Customers Table Section */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <table className="w-full text-left">
-                    <thead className="bg-gray-50/50 border-b border-gray-200">
+                    <thead className="bg-[#fcfdfe] border-b border-gray-100">
                         <tr>
-                            <th className="px-6 py-4 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Customer Profile</th>
-                            <th className="px-6 py-4 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Contact Details</th>
-                            <th className="px-6 py-4 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Address</th>
-                            <th className="px-6 py-4 text-[11px] font-bold text-gray-400 uppercase tracking-widest">History</th>
-                            <th className="px-6 py-4 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Financials</th>
-                            <th className="px-6 py-4 text-[11px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
-                            <th className="px-6 py-4 text-[11px] font-bold text-gray-400 uppercase tracking-widest text-right">Actions</th>
+                            <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Customer Profile</th>
+                            <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Contact Details</th>
+                            <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Address</th>
+                            <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">History</th>
+                            <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Financials</th>
+                            <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
+                            <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50 text-sm">
                         {filteredCustomers.map((customer, index) => (
-                            <tr key={customer._id || customer.id} className="hover:bg-gray-50/50 transition-colors group">
+                            <tr key={customer._id || customer.id} className="hover:bg-gray-50/30 transition-colors group">
                                 <td className="px-6 py-4">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-gradient-to-br from-green-50 to-emerald-50 rounded-full flex items-center justify-center text-emerald-600 font-black text-xs border border-emerald-100 shadow-sm transition-transform group-hover:scale-105">
+                                        <div className="w-9 h-9 bg-gray-50 rounded-full flex items-center justify-center text-emerald-600 font-bold text-xs border border-gray-100 transition-transform group-hover:scale-105">
                                             {customer.name.charAt(0).toUpperCase()}
                                         </div>
                                         <div>
-                                            <div className="font-bold text-gray-800">{customer.name}</div>
-                                            <div className="text-[10px] text-gray-400 flex items-center gap-1">
-                                                <Clock size={10} /> Member since {customer.joinDate || 'N/A'}
+                                            <div className="font-semibold text-gray-800 text-sm">{customer.name}</div>
+                                            <div className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5">
+                                                <Clock size={10} /> {customer.joinDate || 'N/A'}
                                             </div>
                                         </div>
                                     </div>
                                 </td>
                                 <td className="px-6 py-4">
                                     <div className="flex flex-col gap-1">
-                                        <div className="flex items-center gap-2 text-xs text-gray-600 font-medium">
-                                            <div className="w-5 h-5 rounded bg-gray-50 flex items-center justify-center text-gray-400">
-                                                <Mail size={12} />
-                                            </div>
-                                            <span>{customer.email || 'No email'}</span>
+                                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                                            <Mail size={12} className="text-gray-300" />
+                                            <span>{customer.email || '—'}</span>
                                         </div>
-                                        <div className="flex items-center gap-2 text-xs text-gray-600 font-medium">
-                                            <div className="w-5 h-5 rounded bg-gray-50 flex items-center justify-center text-gray-400">
-                                                <Phone size={12} />
-                                            </div>
-                                            <span>{customer.phone || 'No phone'}</span>
+                                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                                            <Phone size={12} className="text-gray-300" />
+                                            <span>{customer.phone || '—'}</span>
                                         </div>
                                     </div>
                                 </td>
                                 <td className="px-6 py-4">
-                                    <div className="flex items-center gap-2 text-xs text-gray-600 font-medium">
-                                        <MapPin size={14} className="text-gray-400" />
-                                        <span className="max-w-[150px] truncate">{customer.address || 'N/A'}</span>
+                                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                                        <MapPin size={12} className="text-gray-300 shrink-0" />
+                                        <span className="max-w-[140px] truncate">{customer.address || '—'}</span>
                                     </div>
                                 </td>
                                 <td className="px-6 py-4">
                                     <div className="flex flex-col">
-                                        <span className="text-gray-800 font-bold">{customer.totalPurchases || 0}</span>
-                                        <span className="text-[10px] text-gray-400 font-medium uppercase tracking-tight">Total Orders</span>
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4 text-emerald-600">
-                                    <div className="flex flex-col">
-                                        <span className="text-gray-900 font-black">Rs. {(customer.totalSpent || 0).toLocaleString()}</span>
-                                        <span className="text-[10px] text-emerald-500 font-bold uppercase tracking-tight">Total Spent</span>
+                                        <span className="text-gray-700 font-semibold">{customer.totalPurchases || 0}</span>
+                                        <span className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">Orders</span>
                                     </div>
                                 </td>
                                 <td className="px-6 py-4">
-                                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider shadow-sm border ${customer.status === 'Active'
-                                        ? 'bg-green-100 text-green-700 border-green-200'
-                                        : 'bg-gray-100 text-gray-500 border-gray-200'
+                                    <div className="flex flex-col">
+                                        <span className="text-gray-900 font-bold">Rs. {(customer.totalSpent || 0).toLocaleString()}</span>
+                                        <span className="text-[9px] text-emerald-500 font-bold uppercase tracking-tighter">Net Spent</span>
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4">
+                                    <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${customer.status === 'Active'
+                                        ? 'text-emerald-600'
+                                        : 'text-gray-400'
                                         }`}>
+                                        <div className={`w-1.5 h-1.5 rounded-full ${customer.status === 'Active' ? 'bg-emerald-500 animate-pulse' : 'bg-gray-300'}`} />
                                         {customer.status || 'Active'}
-                                    </span>
+                                    </div>
                                 </td>
                                 <td className="px-6 py-4 text-right">
-                                    <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <button
                                             onClick={() => handleViewCustomer(customer)}
-                                            className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
                                             title="View Profile"
                                         >
                                             <Search size={14} />
                                         </button>
                                         <button
                                             onClick={() => handleEditCustomer(customer)}
-                                            className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
+                                            className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
                                             title="Edit Details"
                                         >
                                             <Edit3 size={14} />
@@ -404,8 +401,8 @@ const Customers = () => {
                 </table>
                 {filteredCustomers.length === 0 && (
                     <div className="py-20 text-center">
-                        <div className="inline-flex p-4 bg-gray-50 rounded-full text-gray-400 mb-4 font-black text-2xl">
-                            ?
+                        <div className="inline-flex p-4 bg-gray-50 rounded-full text-gray-300 mb-4">
+                            <Users size={32} />
                         </div>
                         <h3 className="text-gray-800 font-bold">No customers found</h3>
                         <p className="text-gray-500 text-sm">Try adjusting your search or filters</p>
@@ -413,9 +410,9 @@ const Customers = () => {
                 )}
             </div>
 
-            <div className="mt-4 flex items-center justify-between text-[11px] font-bold text-gray-400 uppercase tracking-widest px-2">
+            <div className="mt-4 flex items-center justify-between text-[10px] font-bold text-gray-300 uppercase tracking-widest px-2">
                 <span>Displaying {filteredCustomers.length} Profile(s)</span>
-                <span>Active Database: {customers.length} Entries</span>
+                <span>Database: {customers.length} Entries</span>
             </div>
 
             <AddCustomerModal
