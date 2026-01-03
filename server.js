@@ -740,6 +740,8 @@ const supplySchema = new mongoose.Schema({
     igstAmount: { type: Number, default: 0 },
     totalGst: { type: Number, default: 0 },
     payableAmount: { type: Number, default: 0 },
+    packSize: { type: Number, default: 1 }, // Added for accuracy
+    formula: String, // Added code/name
     boxNumber: String,
     notes: String,
     // Item-level payment tracking
@@ -873,6 +875,9 @@ const batchSchema = new mongoose.Schema({
     supplierName: String, // Denormalized
     costPrice: Number,
     sellingPrice: Number,
+    mrp: { type: Number, default: 0 },
+    packSize: { type: Number, default: 1 },
+    formula: String,
     status: {
         type: String,
         enum: ['Active', 'Blocked', 'Expired', 'Returned', 'WrittenOff'],
@@ -2985,10 +2990,15 @@ app.post('/api/purchase-orders/:id/receive', async (req, res) => {
             const bonusQty = Number(item.bonusQuantity) || 0;
             const totalUnits = receivedQty + bonusQty;
 
-            // 1. Update Medicine Master Stock
+            // 1. Update Medicine Master Stock and Details
             medicine.stock = (medicine.stock || 0) + totalUnits;
             medicine.inInventory = true;
             if (item.costPerUnit) medicine.costPrice = item.costPerUnit;
+            if (item.sellingPrice) medicine.price = item.sellingPrice;
+            if (item.sellingPrice) medicine.sellingPrice = item.sellingPrice;
+            if (item.mrp) medicine.mrp = item.mrp;
+            if (item.packSize) medicine.packSize = item.packSize;
+            if (item.formula) medicine.formulaCode = item.formula;
             await medicine.save({ session });
 
             // 2. Create Batch Entry
@@ -3003,7 +3013,10 @@ app.post('/api/purchase-orders/:id/receive', async (req, res) => {
                 supplierId: supplier._id,
                 supplierName: supplier.name,
                 costPrice: item.costPerUnit || item.unitPrice,
-                sellingPrice: medicine.price || (item.unitPrice * 1.2),
+                sellingPrice: item.sellingPrice || medicine.price || (item.unitPrice * 1.2),
+                mrp: item.mrp || 0,
+                packSize: item.packSize || 1,
+                formula: item.formula || medicine.formulaCode,
                 status: 'Active'
             });
             await newBatch.save({ session });
@@ -3024,6 +3037,10 @@ app.post('/api/purchase-orders/:id/receive', async (req, res) => {
                 freeQuantity: bonusQty,
                 itemAmount: itemTotal,
                 payableAmount: itemTotal,
+                mrp: item.mrp || 0,
+                sellingPrice: item.sellingPrice || medicine.price,
+                packSize: item.packSize || 1,
+                formula: item.formula || medicine.formulaCode,
                 paymentStatus: 'Unpaid',
                 paidAmount: 0,
                 addedDate: invoiceDate || new Date()
