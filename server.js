@@ -3552,12 +3552,21 @@ app.post('/api/transactions/:id/void', async (req, res) => {
 // Staff Management Schemas (salary-driven)
 const staffSchema = new mongoose.Schema({
     name: { type: String, required: true },
-    phone: { type: String, required: true },
+    fatherName: String,
     cnic: String,
+    phone: { type: String, required: true },
+    email: String,
+    address: String,
+    city: String,
     role: {
         type: String,
         enum: [
+            'Owner',
             'Pharmacist',
+            'Counter Salesman',
+            'Store Manager',
+            'Accountant',
+            'Helper / Peon',
             'Assistant Pharmacist',
             'Salesman',
             'Cashier',
@@ -3565,10 +3574,14 @@ const staffSchema = new mongoose.Schema({
             'Delivery Rider',
             'Admin'
         ],
-        default: 'Salesman'
+        default: 'Counter Salesman'
     },
+    employmentType: { type: String, default: 'Permanent' },
+    shift: String,
     status: { type: String, enum: ['Active', 'Deactivated'], default: 'Active' },
     joiningDate: { type: Date, default: Date.now },
+    emergencyContactName: String,
+    emergencyContactPhone: String,
 
     // Salary configuration
     salaryType: {

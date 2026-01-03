@@ -18,9 +18,6 @@ import Vouchers from './pages/Vouchers';
 import Return from './pages/Return';
 import Report from './pages/Report';
 import Staff from './pages/Staff';
-import StaffEdit from './pages/StaffEdit';
-import StaffPaySalary from './pages/StaffPaySalary';
-import StaffAddAdvance from './pages/StaffAddAdvance';
 import CashDrawer from './pages/CashDrawer';
 import OwnerSetup from './pages/OwnerSetup';
 import LoaderDemo from './pages/LoaderDemo';
@@ -96,9 +93,6 @@ function App() {
             {/* Admin Only Routes */}
             <Route element={<ProtectedRoute roles={['Admin', 'Super Admin']} />}>
               <Route path="staff" element={<Staff />} />
-              <Route path="staff/:id/edit" element={<StaffEdit />} />
-              <Route path="staff/:id/pay-salary" element={<StaffPaySalary />} />
-              <Route path="staff/:id/add-advance" element={<StaffAddAdvance />} />
               <Route path="users" element={<Users />} />
               <Route path="reports" element={<Report />} />
               <Route path="vouchers" element={<Vouchers />} />
