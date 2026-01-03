@@ -6,6 +6,7 @@ import RecordPaymentModal from '../components/suppliers/RecordPaymentModal';
 import InvoiceDetailsModal from '../components/invoices/InvoiceDetailsModal';
 import PurchaseReturnModal from '../components/suppliers/PurchaseReturnModal';
 import CashRefundModal from '../components/suppliers/CashRefundModal';
+import ConfirmationModal from '../components/common/ConfirmationModal';
 import API_URL from '../config/api';
 
 
@@ -36,6 +37,17 @@ const SupplierDetails = () => {
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [filter, setFilter] = useState('All');
     const [monthFilter, setMonthFilter] = useState('All');
+
+    // Confirmation Modal States
+    const [confirmConfig, setConfirmConfig] = useState({
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: () => { },
+        type: 'warning',
+        confirmText: 'Confirm',
+        isLoading: false
+    });
 
     const months = [
         'January', 'February', 'March', 'April', 'May', 'June',
@@ -111,12 +123,20 @@ const SupplierDetails = () => {
         }
     };
 
-    const handleVoidInvoice = async (invoice) => {
-        if (!window.confirm(`Are you sure you want to void/delete invoice ${invoice.ref}? This will delete ${invoice.items ? invoice.items.length : 1} items.`)) {
-            return;
-        }
+    const handleVoidInvoice = (invoice) => {
+        setConfirmConfig({
+            isOpen: true,
+            title: 'Void Invoice',
+            message: `Are you sure you want to void/delete invoice ${invoice.ref}? This will delete ${invoice.items ? invoice.items.length : 1} items from stock.`,
+            confirmText: 'Yes, Void Invoice',
+            type: 'danger',
+            onConfirm: () => confirmVoidInvoice(invoice)
+        });
+    };
 
+    const confirmVoidInvoice = async (invoice) => {
         try {
+            setConfirmConfig(prev => ({ ...prev, isLoading: true }));
             if (invoice.type === 'Invoice') {
                 await fetch(`${API_URL}/api/supplies/${invoice.id}`, { method: 'DELETE' });
             } else if (invoice.items) {
@@ -127,10 +147,13 @@ const SupplierDetails = () => {
 
             showToast('Invoice voided successfully', 'success');
             setIsInvoiceModalOpen(false);
+            setConfirmConfig(prev => ({ ...prev, isOpen: false }));
             fetchSupplierDetails();
         } catch (error) {
             console.error('Error voiding invoice:', error);
             showToast('Failed to void invoice', 'error');
+        } finally {
+            setConfirmConfig(prev => ({ ...prev, isLoading: false }));
         }
     };
 
@@ -140,27 +163,28 @@ const SupplierDetails = () => {
         setIsPaymentModalOpen(true);
     };
 
-    const handleClearHistory = async () => {
-        if (!window.confirm(
-            `⚠️ WARNING: This will permanently delete ALL transactions for ${supplier.name}.\n\n` +
-            `This includes:\n` +
-            `- All invoices/purchases\n` +
-            `- All payments\n` +
-            `- All returns\n\n` +
-            `The supplier will be reset to a fresh state with zero balance.\n\n` +
-            `Are you absolutely sure you want to continue?`
-        )) {
-            return;
-        }
+    const handleClearHistory = () => {
+        setConfirmConfig({
+            isOpen: true,
+            title: 'Clear All Transactions?',
+            message: `WARNING: This will permanently delete ALL transactions for ${supplier.name}. This includes all invoices, payments, and returns. The supplier will be reset to zero balance. This action cannot be undone.`,
+            confirmText: 'Yes, Clear Everything',
+            type: 'danger',
+            onConfirm: confirmClearHistory
+        });
+    };
 
+    const confirmClearHistory = async () => {
         try {
+            setConfirmConfig(prev => ({ ...prev, isLoading: true }));
             const response = await fetch(`${API_URL}/api/suppliers/${id}/clear-history`, {
                 method: 'POST'
             });
 
             if (response.ok) {
                 showToast('Supplier history cleared successfully!', 'success');
-                fetchSupplierDetails(); // Refresh the page
+                setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+                fetchSupplierDetails();
             } else {
                 const error = await response.json();
                 showToast(error.message || 'Failed to clear history', 'error');
@@ -168,6 +192,8 @@ const SupplierDetails = () => {
         } catch (error) {
             console.error('Error clearing history:', error);
             showToast('Error clearing supplier history', 'error');
+        } finally {
+            setConfirmConfig(prev => ({ ...prev, isLoading: false }));
         }
     };
 
@@ -602,6 +628,17 @@ const SupplierDetails = () => {
                 invoice={selectedInvoice}
                 onVoid={handleVoidInvoice}
                 onPaySelected={handlePaySelected}
+            />
+
+            <ConfirmationModal
+                isOpen={confirmConfig.isOpen}
+                onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+                onConfirm={confirmConfig.onConfirm}
+                title={confirmConfig.title}
+                message={confirmConfig.message}
+                confirmText={confirmConfig.confirmText}
+                type={confirmConfig.type}
+                isLoading={confirmConfig.isLoading}
             />
         </div>
     );

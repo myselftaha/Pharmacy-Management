@@ -1126,7 +1126,7 @@ app.get('/api/supplies', async (req, res) => {
             });
             return {
                 ...supply.toObject(),
-                currentStock: med ? (med.stock / (parseFloat(med.netContent) || 1)) : 0,
+                currentStock: med ? (med.stock / (parseFloat(med.netContent) || parseFloat(med.packSize) || 1)) : 0,
                 // Merging medicine details for the UI
                 description: med ? med.description : '',
                 price: med ? med.price : 0,
@@ -2988,16 +2988,18 @@ app.post('/api/purchase-orders/:id/receive', async (req, res) => {
 
             const receivedQty = Number(item.receivedQuantity) || 0;
             const bonusQty = Number(item.bonusQuantity) || 0;
-            const totalUnits = receivedQty + bonusQty;
+            const packSize = Number(item.packSize) || Number(medicine.packSize) || 1;
+            const totalUnits = Math.round((receivedQty + bonusQty) * packSize);
 
             // 1. Update Medicine Master Stock and Details
-            medicine.stock = (medicine.stock || 0) + totalUnits;
+            medicine.stock = Math.round((medicine.stock || 0) + totalUnits);
             medicine.inInventory = true;
             if (item.costPerUnit) medicine.costPrice = item.costPerUnit;
             if (item.sellingPrice) medicine.price = item.sellingPrice;
             if (item.sellingPrice) medicine.sellingPrice = item.sellingPrice;
             if (item.mrp) medicine.mrp = item.mrp;
-            if (item.packSize) medicine.packSize = item.packSize;
+            medicine.packSize = packSize;
+            medicine.netContent = packSize.toString();
             if (item.formula) medicine.formulaCode = item.formula;
             await medicine.save({ session });
 

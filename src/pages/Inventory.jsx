@@ -596,7 +596,7 @@ const Inventory = () => {
                                 <div key={index} className="group">
                                     <div className="flex justify-between text-sm mb-2">
                                         <span className="font-semibold text-gray-700">{cat.name}</span>
-                                        <span className="text-gray-500 font-medium">{cat.units.toFixed(0)}</span>
+                                        <span className="text-gray-500 font-medium">{cat.units % 1 === 0 ? cat.units : cat.units.toFixed(1)}</span>
                                     </div>
                                     <div className="h-2 w-full bg-gray-50 rounded-full overflow-hidden border border-gray-100">
                                         <div
@@ -659,7 +659,7 @@ const Inventory = () => {
                                                         ></div>
                                                     </div>
                                                     <span className={`text-xs font-bold ${item.stock === 0 ? 'text-red-500' : 'text-yellow-600'}`}>
-                                                        {(item.stock / (item.packSize || 1)).toFixed(0)}
+                                                        {(item.stock / (item.packSize || 1)) % 1 === 0 ? (item.stock / (item.packSize || 1)) : (item.stock / (item.packSize || 1)).toFixed(1)}
                                                     </span>
                                                 </div>
                                             </td>
@@ -772,7 +772,7 @@ const Inventory = () => {
                                                             </span>
                                                         </td>
                                                         <td className="px-4 py-2.5">
-                                                            <span className="font-medium text-gray-700 text-xs">{(item.stock / (item.packSize || 1)).toFixed(1)} Packs</span>
+                                                            <span className="font-medium text-gray-700 text-xs">{(item.stock / (item.packSize || 1)) % 1 === 0 ? (item.stock / (item.packSize || 1)) : (item.stock / (item.packSize || 1)).toFixed(1)} Packs</span>
                                                         </td>
                                                         <td className="px-4 py-2.5">
                                                             <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border ${isExpired ? 'bg-red-50 border-red-100 text-red-700' : 'bg-orange-50 border-orange-100 text-orange-700'

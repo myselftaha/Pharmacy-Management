@@ -183,7 +183,7 @@ const PurchaseOrderModal = ({ isOpen, onClose, supplier, onSuccess }) => {
                                         </div>
 
                                         <div className="col-span-2">
-                                            <label className="block text-xs font-medium text-gray-600 mb-1.5">Quantity</label>
+                                            <label className="block text-xs font-medium text-gray-600 mb-1.5 whitespace-nowrap">Quantity (Packs)</label>
                                             <input
                                                 type="number"
                                                 value={item.quantity}
@@ -193,7 +193,7 @@ const PurchaseOrderModal = ({ isOpen, onClose, supplier, onSuccess }) => {
                                         </div>
 
                                         <div className="col-span-2">
-                                            <label className="block text-xs font-medium text-gray-600 mb-1.5">Unit Price</label>
+                                            <label className="block text-xs font-medium text-gray-600 mb-1.5 whitespace-nowrap">Price per Pack</label>
                                             <input
                                                 type="number"
                                                 value={item.unitPrice}

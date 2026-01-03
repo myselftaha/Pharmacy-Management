@@ -6,6 +6,7 @@ import RecordPaymentModal from './RecordPaymentModal';
 import ReceiveStockModal from './ReceiveStockModal';
 import PurchaseOrderModal from './PurchaseOrderModal';
 import { ShoppingCart, CheckCircle, XCircle, Trash2 } from 'lucide-react';
+import ConfirmationModal from '../common/ConfirmationModal';
 
 const DistributorLedgerModal = ({ isOpen, onClose, supplier, onUpdate }) => {
     const { showToast } = useToast();
@@ -16,7 +17,10 @@ const DistributorLedgerModal = ({ isOpen, onClose, supplier, onUpdate }) => {
     const [isRecordPaymentOpen, setIsRecordPaymentOpen] = useState(false);
     const [isReceiveStockOpen, setIsReceiveStockOpen] = useState(false);
     const [isPurchaseOrderOpen, setIsPurchaseOrderOpen] = useState(false);
+    const [isCancelConfirmOpen, setIsCancelConfirmOpen] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
+    const [orderToCancel, setOrderToCancel] = useState(null);
+    const [cancelling, setCancelling] = useState(false);
 
     const handlePaymentSuccess = () => {
         fetchLedger();
@@ -55,20 +59,30 @@ const DistributorLedgerModal = ({ isOpen, onClose, supplier, onUpdate }) => {
         }
     };
 
-    const handleCancelOrder = async (orderId) => {
-        if (!window.confirm('Are you sure you want to cancel this order?')) return;
+    const handleCancelOrderClick = (orderId) => {
+        setOrderToCancel(orderId);
+        setIsCancelConfirmOpen(true);
+    };
+
+    const confirmCancelOrder = async () => {
+        if (!orderToCancel) return;
         try {
-            const response = await fetch(`${API_URL}/api/purchase-orders/${orderId}/cancel`, {
+            setCancelling(true);
+            const response = await fetch(`${API_URL}/api/purchase-orders/${orderToCancel}/cancel`, {
                 method: 'POST'
             });
             if (response.ok) {
                 showToast('Order cancelled successfully', 'success');
                 fetchPurchaseOrders();
+                setIsCancelConfirmOpen(false);
+                setOrderToCancel(null);
             } else {
                 showToast('Failed to cancel order', 'error');
             }
         } catch (error) {
             showToast('Network error', 'error');
+        } finally {
+            setCancelling(false);
         }
     };
 
@@ -275,7 +289,7 @@ const DistributorLedgerModal = ({ isOpen, onClose, supplier, onUpdate }) => {
                                                                             <CheckCircle size={18} />
                                                                         </button>
                                                                         <button
-                                                                            onClick={() => handleCancelOrder(order._id)}
+                                                                            onClick={() => handleCancelOrderClick(order._id)}
                                                                             className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                                                                             title="Cancel Order"
                                                                         >
@@ -325,6 +339,21 @@ const DistributorLedgerModal = ({ isOpen, onClose, supplier, onUpdate }) => {
                     fetchPurchaseOrders();
                     fetchLedger();
                 }}
+            />
+
+            <ConfirmationModal
+                isOpen={isCancelConfirmOpen}
+                onClose={() => {
+                    setIsCancelConfirmOpen(false);
+                    setOrderToCancel(null);
+                }}
+                onConfirm={confirmCancelOrder}
+                title="Cancel Purchase Order"
+                message="Are you sure you want to cancel this order? This action will set the order status to 'Cancelled' and cannot be reversed."
+                confirmText="Yes, Cancel Order"
+                cancelText="Keep Order"
+                type="danger"
+                isLoading={cancelling}
             />
         </div>
     );

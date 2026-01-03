@@ -3,6 +3,7 @@ import { Search, Plus, Ticket, Calendar, DollarSign, Users } from 'lucide-react'
 import { useToast } from '../context/ToastContext';
 import AddVoucherModal from '../components/vouchers/AddVoucherModal';
 import EditVoucherModal from '../components/vouchers/EditVoucherModal';
+import ConfirmationModal from '../components/common/ConfirmationModal';
 import API_URL from '../config/api';
 
 
@@ -13,7 +14,10 @@ const Vouchers = () => {
     const [loading, setLoading] = useState(true);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
     const [selectedVoucher, setSelectedVoucher] = useState(null);
+    const [voucherToDelete, setVoucherToDelete] = useState(null);
+    const [deleting, setDeleting] = useState(false);
 
     useEffect(() => {
         fetchVouchers();
@@ -100,19 +104,24 @@ const Vouchers = () => {
         }
     };
 
-    const handleDeleteVoucher = async (voucherId) => {
-        if (!window.confirm('Are you sure you want to delete this voucher? This action cannot be undone.')) {
-            return;
-        }
+    const handleDeleteVoucher = (voucherId) => {
+        setVoucherToDelete(voucherId);
+        setIsDeleteConfirmOpen(true);
+    };
 
+    const confirmDeleteVoucher = async () => {
+        if (!voucherToDelete) return;
         try {
-            const response = await fetch(`${API_URL}/api/vouchers/${voucherId}`, {
+            setDeleting(true);
+            const response = await fetch(`${API_URL}/api/vouchers/${voucherToDelete}`, {
                 method: 'DELETE'
             });
 
             if (response.ok) {
                 await fetchVouchers();
                 showToast('Voucher deleted successfully', 'success');
+                setIsDeleteConfirmOpen(false);
+                setVoucherToDelete(null);
             } else {
                 const error = await response.json();
                 showToast('Failed to delete voucher: ' + error.message, 'error');
@@ -120,6 +129,8 @@ const Vouchers = () => {
         } catch (error) {
             console.error('Error deleting voucher:', error);
             showToast('Error deleting voucher: ' + error.message, 'error');
+        } finally {
+            setDeleting(false);
         }
     };
 
@@ -317,6 +328,21 @@ const Vouchers = () => {
                 }}
                 voucher={selectedVoucher}
                 onSave={handleUpdateVoucher}
+            />
+
+            <ConfirmationModal
+                isOpen={isDeleteConfirmOpen}
+                onClose={() => {
+                    setIsDeleteConfirmOpen(false);
+                    setVoucherToDelete(null);
+                }}
+                onConfirm={confirmDeleteVoucher}
+                title="Delete Voucher"
+                message="Are you sure you want to delete this voucher? This action cannot be undone and will permanently remove it from the system."
+                confirmText="Yes, Delete Voucher"
+                cancelText="Keep Voucher"
+                type="danger"
+                isLoading={deleting}
             />
         </div>
     );
