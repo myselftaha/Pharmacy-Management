@@ -22,8 +22,7 @@ const SupplyTable = ({ supplies, onEdit, onDelete }) => {
                             <th className="px-6 py-3">Medicine</th>
                             <th className="px-6 py-3">Batch</th>
                             <th className="px-6 py-3">Cost Price</th>
-                            <th className="px-6 py-3">Received</th>
-                            <th className="px-6 py-3">Total Medical Stock</th>
+                            <th className="px-6 py-3">Current Stock</th>
                             <th className="px-6 py-3">Expiry</th>
                             <th className="px-6 py-3 text-right">Action</th>
                         </tr>
@@ -45,9 +44,6 @@ const SupplyTable = ({ supplies, onEdit, onDelete }) => {
                                 <td className="px-6 py-4 text-sm font-medium text-gray-800 whitespace-nowrap">
                                     Rs. {(supply.purchaseCost * (supply.packSize || 1)).toFixed(2)}
                                     <div className="text-[9px] text-gray-400 font-normal uppercase">Per Pack</div>
-                                </td>
-                                <td className="px-6 py-4 text-sm font-bold text-blue-600 whitespace-nowrap">
-                                    {supply.quantity / (supply.packSize || 1)} <span className="text-[10px] text-gray-400 font-normal uppercase">Packs</span>
                                 </td>
                                 <td className={`px-6 py-4 text-sm font-bold whitespace-nowrap ${supply.currentStock <= 0 ? 'text-red-600' : 'text-green-600'}`}>
                                     {supply.currentStock % 1 === 0 ? supply.currentStock : supply.currentStock.toFixed(2)} <span className="text-[10px] text-gray-400 font-normal uppercase">Packs</span>
